@@ -1,0 +1,30 @@
+.status-light {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  position: relative;
+  display: inline-block;
+  margin-right: 10px;
+  transition: background-color 0.3s ease;
+}
+
+/* Add z-index to ensure lights are visible */
+.status-light.healthy {
+  background-color: #2ecc71; /* Green */
+  box-shadow: 0 0 8px rgba(46, 204, 113, 0.5);
+}
+
+.status-light.warning {
+  background-color: #f1c40f; /* Yellow */
+  box-shadow: 0 0 8px rgba(241, 196, 15, 0.5);
+}
+
+.status-light.error {
+  background-color: #e74c3c; /* Red */
+  box-shadow: 0 0 8px rgba(231, 76, 60, 0.5);
+}
+
+.status-light.offline {
+  background-color: #95a5a6; /* Gray */
+  box-shadow: 0 0 8px rgba(149, 165, 166, 0.5);
+}
