@@ -15,6 +15,7 @@ contextBridge.exposeInMainWorld("electronAPI", {
   getMnemonicPath: (chainId) => ipcRenderer.invoke("get-mnemonic-path", chainId),
   stopChain: (chainId) => ipcRenderer.invoke("stop-chain", chainId),
   getChainStatus: (chainId) => ipcRenderer.invoke("get-chain-status", chainId),
+  getChainBlockCount: (chainId) => ipcRenderer.invoke("get-chain-block-count", chainId),
   openDataDir: (chainId) => ipcRenderer.invoke("open-data-dir", chainId),
   getFullDataDir: (chainId) => ipcRenderer.invoke("get-full-data-dir", chainId),
   getWalletDir: (chainId) => ipcRenderer.invoke("get-wallet-dir", chainId),

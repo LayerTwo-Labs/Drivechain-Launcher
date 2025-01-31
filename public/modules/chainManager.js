@@ -18,6 +18,21 @@ class ChainManager {
     this.processCheckers = new Map(); // Track process check intervals
   }
 
+  async getChainBlockCount(chainId) {
+    const status = this.chainStatuses.get(chainId);
+    if (status !== 'running') return -1;
+    
+    if (chainId === 'bitcoin') {
+      try {
+        return await this.bitcoinMonitor.makeRpcCall('getblockcount', [], true);
+      } catch (error) {
+        return -1;
+      }
+    }
+    
+    return -1;
+  }
+
   async isChainReady(chainId) {
     const status = this.chainStatuses.get(chainId);
     if (status !== 'running') return false;

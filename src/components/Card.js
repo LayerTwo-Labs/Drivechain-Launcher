@@ -1,7 +1,7 @@
 import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { useTheme } from '../contexts/ThemeContext';
 import ChainSettingsModal from './ChainSettingsModal';
-import './StatusLight.css'; // Will create this next
+import './StatusLight.css';
 import ForceStopModal from './ForceStopModal';
 import SettingsIcon from './SettingsIcon';
 import Tooltip from './Tooltip';
@@ -24,50 +24,48 @@ const Card = ({
   const [lastActionTime, setLastActionTime] = useState(0);
   const [tooltipVisible, setTooltipVisible] = useState(false);
   const [tooltipPosition, setTooltipPosition] = useState({ x: 0, y: 0 });
-  const [processHealth, setProcessHealth] = useState('healthy'); // 'healthy', 'warning', 'error', 'offline'
+  const [processHealth, setProcessHealth] = useState('offline'); // 'healthy', 'warning', 'error', 'offline'
+  const [blockCount, setBlockCount] = useState(-1);
   const buttonRef = useRef(null);
 
-  // Demo effect to cycle through status colors
+  // Periodic chain status / health check
   useEffect(() => {
-    const statuses = ['healthy', 'warning', 'error', 'offline'];
-    let currentIndex = 0;
-    
+    const fetchBlockCount = async () => {
+      try {
+        const count = await window.electronAPI.getChainBlockCount(chain.id);
+        console.log("new count: ", count)
+        setBlockCount(count);
+      } catch (error) {
+        setBlockCount(-1)
+        console.error('Failed to fetch block count:', error);
+      }
+    };
+
+    // Initial fetch
+    fetchBlockCount();
+
     const interval = setInterval(() => {
-      currentIndex = (currentIndex + 1) % statuses.length;
-      setProcessHealth(statuses[currentIndex]);
-    }, 2000);
+      fetchBlockCount();
+
+      if (chain.status === 'stopping' || chain.status === 'stopped') {
+        setProcessHealth('offline');
+      } 
+      else 
+      if (blockCount === -1) {
+          setProcessHealth('offline');
+      }
+      else 
+      if (blockCount === 0) {
+          setProcessHealth('warning');
+      }
+      else
+      if (blockCount > 0) {
+          setProcessHealth('healthy');
+      }
+    }, 1000);
 
     return () => clearInterval(interval);
-  }, []);
-
-  // TODO: Set up IPC/RPC communication for real process health updates
-  // Example implementation:
-  /*
-  useEffect(() => {
-    // Subscribe to process health updates
-    const unsubscribe = window.electronAPI.onProcessHealthUpdate(chain.id, (health) => {
-      // health object might contain:
-      // - memory usage
-      // - CPU usage
-      // - error counts
-      // - response times
-      // - connection status
-      
-      // Determine status based on health metrics
-      if (health.error_count > threshold) {
-        setProcessHealth('error');
-      } else if (health.memory_usage > warningThreshold) {
-        setProcessHealth('warning');
-      } else if (!health.connected) {
-        setProcessHealth('offline');
-      } else {
-        setProcessHealth('healthy');
-      }
-    });
-
-    return () => unsubscribe();
-  }, [chain.id]);
-  */
+  }, [chain.id, chain.status, blockCount]);
 
   const checkDependencies = () => {
     if (!chain.dependencies || chain.dependencies.length === 0) return true;
@@ -139,6 +137,7 @@ const Card = ({
           console.log(`Stopping chain ${chain.id}`);
           // Update UI immediately to show stopping state
           onUpdateChain(chain.id, { status: 'stopping' });
+          setProcessHealth('offline');
           await onStop(chain.id);
         } catch (error) {
           console.error('Stop failed:', error);
@@ -240,9 +239,14 @@ const Card = ({
   return (
     <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minWidth: '300px' }}>
       <div className={`card ${isDarkMode ? 'dark' : 'light'}`}>
-        <div className="card-header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', position: 'relative' }}>
-          <h2 style={{ margin: 0, lineHeight: 1.2 }}>{chain.display_name}</h2>
-          <div className={`status-light ${processHealth}`} title={`Process Status: ${processHealth}`} />
+        <div className="card-header" style={{ position: 'relative' }}>
+          <div style={{ display: 'flex', alignItems: 'center' }}>
+            <div className={`status-light ${processHealth}`} title={`Process Status: ${processHealth}`} style={{ marginRight: '10px' }} />
+            <h2 style={{ margin: 0, lineHeight: 1.2 }}>{chain.display_name}</h2>
+          </div>
+          <div style={{ fontSize: '1em', color: isDarkMode ? '#fff' : '#333', marginTop: '4px', marginLeft: '24px', fontWeight: 500 }}>
+            {processHealth === 'healthy' && blockCount >= 0 ? `#Blocks: ${blockCount}` : 'Chain not started'}
+          </div>
         </div>
         <div className="card-content">
           <p>{chain.description}</p>

@@ -199,6 +199,15 @@ function setupIPCHandlers() {
     }
   });
 
+  ipcMain.handle("get-chain-block-count", async (event, chainId) => {
+    try {
+      return await chainManager.getChainBlockCount(chainId);
+    } catch (error) {
+      console.error("Failed to get chain block count:", error);
+      return 0;
+    }
+  });
+
   ipcMain.handle("reset-chain", async (event, chainId) => {
     try {
       return await chainManager.resetChain(chainId);

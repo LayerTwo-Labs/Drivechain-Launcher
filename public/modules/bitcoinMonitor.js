@@ -14,7 +14,7 @@ class BitcoinMonitor {
     };
   }
 
-  async makeRpcCall(method, params = []) {
+  async makeRpcCall(method, params = [], quiet_mode = false) {
     try {
       const response = await axios.post(`http://${this.rpcConfig.host}:${this.rpcConfig.port}`, {
         jsonrpc: '1.0',
@@ -29,7 +29,8 @@ class BitcoinMonitor {
       });
       return response.data.result;
     } catch (error) {
-      console.error(`RPC call failed (${method}):`, error.message);
+      if (!quiet_mode)
+        console.error(`RPC call failed (${method}):`, error.message);
       throw error;
     }
   }
