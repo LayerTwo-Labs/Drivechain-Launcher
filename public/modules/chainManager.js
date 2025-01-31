@@ -384,29 +384,51 @@ class ChainManager {
             status: "stopping"
           });
 
-          // Stop process checker if exists
-          const checkInterval = this.processCheckers.get(chainId);
-          if (checkInterval) {
-            clearInterval(checkInterval);
-            this.processCheckers.delete(chainId);
-          }
-
           // Kill both processes
           if (process.platform === 'darwin') {
-            // Kill both processes
             const killBitWindow = spawn('killall', ['bitwindow']);
             const killBitWindowd = spawn('killall', ['bitwindowd']);
             
+            // Wait for both kill commands to complete
             await Promise.all([
               new Promise(resolve => killBitWindow.on('exit', resolve)),
               new Promise(resolve => killBitWindowd.on('exit', resolve))
             ]);
+
+            // Let the process checker detect the stop and update status
+            await new Promise(resolve => {
+              const maxWaitTime = 5000; // 5 second timeout
+              const startTime = Date.now();
+              
+              const waitInterval = setInterval(() => {
+                const checkProcess = spawn('osascript', ['-e', 'tell application "System Events" to count processes whose name is "bitwindow"']);
+                checkProcess.stdout.on('data', (data) => {
+                  const isRunning = parseInt(data.toString().trim()) > 0;
+                  if (!isRunning || Date.now() - startTime > maxWaitTime) {
+                    clearInterval(waitInterval);
+                    
+                    // Now that we confirmed processes are dead, clean up
+                    const checkInterval = this.processCheckers.get(chainId);
+                    if (checkInterval) {
+                      clearInterval(checkInterval);
+                      this.processCheckers.delete(chainId);
+                    }
+                    
+                    delete this.runningProcesses[chainId];
+                    this.chainStatuses.set(chainId, 'stopped');
+                    this.mainWindow.webContents.send("chain-status-update", {
+                      chainId,
+                      status: "stopped"
+                    });
+                    
+                    resolve();
+                  }
+                });
+              }, 100);
+            });
           } else {
             childProcess.kill();
           }
-
-          delete this.runningProcesses[chainId];
-          this.chainStatuses.set(chainId, 'stopped');
           return { success: true };
         } catch (error) {
           console.error('Failed to stop BitWindow gracefully:', error);

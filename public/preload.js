@@ -95,6 +95,7 @@ contextBridge.exposeInMainWorld("electronAPI", {
   deleteMasterWallet: () => ipcRenderer.invoke("delete-master-wallet"),
   deriveChainWallet: (chainId) => ipcRenderer.invoke("derive-chain-wallet", chainId),
   getChainWallet: (chainId) => ipcRenderer.invoke("get-chain-wallet", chainId),
+  getWalletStarter: (type) => ipcRenderer.invoke("get-wallet-starter", type),
   
   // Advanced Wallet Methods
   previewWallet: (options) => ipcRenderer.invoke("preview-wallet", options),

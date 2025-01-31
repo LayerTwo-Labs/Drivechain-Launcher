@@ -13,6 +13,20 @@ const WelcomeModal = ({ isOpen, onClose }) => {
   const [entropyInput, setEntropyInput] = useState('');
   const [preview, setPreview] = useState(null);
 
+  // Reset all state when modal is opened
+  useEffect(() => {
+    if (isOpen) {
+      setCurrentPage('default');
+      setMnemonic('');
+      setPassphrase('');
+      setIsGenerating(false);
+      setError('');
+      setIsHexMode(false);
+      setEntropyInput('');
+      setPreview(null);
+    }
+  }, [isOpen]);
+
   // Validate hex input
   const isValidHexInput = (value) => {
     // Allow empty input or valid hex characters up to 64 chars

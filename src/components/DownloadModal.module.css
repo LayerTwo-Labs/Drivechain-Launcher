@@ -84,14 +84,42 @@
   background-color: var(--progress-bar-fill);
   transform-origin: left;
   transition: transform 0.3s ease;
-  will-change: transform;
+  will-change: transform, opacity;
   backface-visibility: hidden;
+}
+
+@keyframes pulse {
+  0% { opacity: 1; }
+  50% { opacity: 0.7; }
+  100% { opacity: 1; }
+}
+
+.progressFooter {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 4px;
+  padding: 0 2px;
+}
+
+@keyframes fadeInOut {
+  0% { opacity: 0.5; }
+  50% { opacity: 1; }
+  100% { opacity: 0.5; }
+}
+
+.fileSize {
+  font-size: 12px;
+  color: var(--download-item-text);
+  opacity: 0.7;
+}
+
+.fileSize[data-loading="true"] {
+  animation: fadeInOut 2s ease-in-out infinite;
 }
 
 .progressText {
   font-size: 12px;
   color: var(--download-item-text);
   opacity: 0.7;
-  text-align: right;
-  padding-right: 2px;
 }

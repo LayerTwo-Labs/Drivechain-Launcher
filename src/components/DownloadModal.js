@@ -133,7 +133,12 @@ const DownloadModal = memo(() => {
         <h2>Downloads</h2>
         {activeDownloads.length > 0 ? (
           activeDownloads.map(([chainId, download]) => (
-            <DownloadItem key={chainId} chainId={chainId} {...download} />
+            <DownloadItem 
+              key={chainId} 
+              chainId={chainId} 
+              downloadedLength={download.downloadedLength}
+              {...download} 
+            />
           ))
         ) : (
           <p>No active downloads</p>

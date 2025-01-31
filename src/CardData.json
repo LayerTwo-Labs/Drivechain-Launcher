@@ -21,12 +21,12 @@
     "id": "thunder",
     "display_name": "Thunder",
     "description": "A high performance largeblock sidechain",
-    "dependencies": []
+    "dependencies": ["bitcoin", "enforcer"]
   },
   {
     "id": "bitnames",
     "display_name": "Bitnames",
     "description": "Bitnames sidechain",
-    "dependencies": []
+    "dependencies": ["bitcoin", "enforcer"]
   }
 ]

@@ -8,7 +8,6 @@ Drivechain Launcher is an **Electron-based desktop application** that allows use
 - 🔄 **Start and stop individual chains**
 - ♻️ **Reset chain data**
 - 📊 **View chain details and settings**
-- 🌗 **Dark/Light mode toggle**
 - 🖥️ **Cross-platform support (Windows, macOS, Linux)**
 
 ## 📚 Table of Contents

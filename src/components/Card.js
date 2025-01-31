@@ -72,23 +72,57 @@ const Card = ({
     return chain.dependencies.every(dep => runningNodes.includes(dep));
   };
 
+  const checkReverseDependencies = () => {
+    // Get all chains that depend on this chain
+    const dependentChains = runningNodes.filter(nodeId => {
+      const chainData = window.cardData.find(c => c.id === nodeId);
+      return chainData?.dependencies?.includes(chain.id);
+    });
+    return dependentChains.length === 0;
+  };
+
   const getMissingDependencies = () => {
     if (!chain.dependencies) return [];
     return chain.dependencies.filter(dep => !runningNodes.includes(dep));
   };
 
-  const getTooltipText = () => {
-    const missing = getMissingDependencies();
-    if (missing.length === 0) return '';
-    
-    const missingNames = missing.map(id => {
-      const depName = id.split('-').map(word => 
-        word.charAt(0).toUpperCase() + word.slice(1)
-      ).join(' ');
-      return depName;
+  const getRunningDependents = () => {
+    return runningNodes.filter(nodeId => {
+      const chainData = window.cardData.find(c => c.id === nodeId);
+      return chainData?.dependencies?.includes(chain.id);
     });
+  };
 
-    return `Required dependencies not running:\n${missingNames.join('\n')}`;
+  const getTooltipText = () => {
+    // Check for missing dependencies when starting
+    if (chain.status === 'downloaded' || chain.status === 'stopped') {
+      const missing = getMissingDependencies();
+      if (missing.length > 0) {
+        const missingNames = missing.map(id => {
+          const depName = id.split('-').map(word => 
+            word.charAt(0).toUpperCase() + word.slice(1)
+          ).join(' ');
+          return depName;
+        });
+        return `Required dependencies not running:\n${missingNames.join('\n')}`;
+      }
+    }
+    
+    // Check for running dependents when stopping
+    if (chain.status === 'running' || chain.status === 'starting' || chain.status === 'ready') {
+      const dependents = getRunningDependents();
+      if (dependents.length > 0) {
+        const dependentNames = dependents.map(id => {
+          const depName = id.split('-').map(word => 
+            word.charAt(0).toUpperCase() + word.slice(1)
+          ).join(' ');
+          return depName;
+        });
+        return `Cannot stop: Following chains depend on this:\n${dependentNames.join('\n')}`;
+      }
+    }
+    
+    return '';
   };
 
   const handleAction = async (event) => {
@@ -134,6 +168,12 @@ const Card = ({
       case 'starting':
       case 'ready':
         try {
+          // Check for running dependent chains
+          if (!checkReverseDependencies()) {
+            setShowForceStop(true);
+            return;
+          }
+          
           console.log(`Stopping chain ${chain.id}`);
           // Update UI immediately to show stopping state
           onUpdateChain(chain.id, { status: 'stopping' });
@@ -237,63 +277,63 @@ const Card = ({
   };
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minWidth: '300px' }}>
-      <div className={`card ${isDarkMode ? 'dark' : 'light'}`}>
-        <div className="card-header" style={{ position: 'relative' }}>
-          <div style={{ display: 'flex', alignItems: 'center' }}>
-            <div className={`status-light ${processHealth}`} title={`Process Status: ${processHealth}`} style={{ marginRight: '10px' }} />
-            <h2 style={{ margin: 0, lineHeight: 1.2 }}>{chain.display_name}</h2>
+    <>
+      <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minWidth: '300px' }}>
+        <div className={`card ${isDarkMode ? 'dark' : 'light'}`}>
+          <div className="card-header">
+            <h2>{chain.display_name}</h2>
           </div>
-          <div style={{ fontSize: '1em', color: isDarkMode ? '#fff' : '#333', marginTop: '4px', marginLeft: '24px', fontWeight: 500 }}>
-            {processHealth === 'healthy' && blockCount >= 0 ? `#Blocks: ${blockCount}` : 'Chain not started'}
+          <div className="card-content">
+            <p>{chain.description}</p>
           </div>
-        </div>
-        <div className="card-content">
-          <p>{chain.description}</p>
-        </div>
-        <div className="card-actions">
-          <button
-            ref={buttonRef}
-            className={`btn ${getButtonClass()}`}
-            onClick={handleAction}
-            onMouseEnter={() => setIsHovered(true)}
-            onMouseLeave={handleMouseLeave}
-            disabled={
-              chain.status === 'downloading' || 
-              chain.status === 'extracting' ||
-              chain.status === 'stopping'
-            }
-            id={`download-button-${chain.id}`}
-          >
-            {getButtonText()}
-          </button>
-          <button onClick={handleOpenSettings} aria-label="Chain Settings" style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', display: 'flex' }}>
-            <SettingsIcon />
-          </button>
-        </div>
-        <Tooltip 
-          text={getTooltipText()}
-          visible={tooltipVisible}
-          position={tooltipPosition}
-        />
-        {showSettings && (
-          <ChainSettingsModal
-            chain={fullChainData}
-            onClose={() => setShowSettings(false)}
-            onOpenDataDir={handleOpenDataDir}
-            onOpenWalletDir={onOpenWalletDir}
-            onReset={onReset}
+          <div className="card-actions">
+            <button
+              ref={buttonRef}
+              className={`btn ${getButtonClass()}`}
+              onClick={handleAction}
+              onMouseEnter={() => setIsHovered(true)}
+              onMouseLeave={handleMouseLeave}
+              disabled={
+                chain.status === 'downloading' || 
+                chain.status === 'extracting' ||
+                chain.status === 'stopping'
+              }
+              id={`download-button-${chain.id}`}
+            >
+              {getButtonText()}
+            </button>
+            <button className="settings-icon-button" onClick={handleOpenSettings} aria-label="Chain Settings">
+              <SettingsIcon />
+            </button>
+          </div>
+          <Tooltip 
+            text={getTooltipText()}
+            visible={tooltipVisible}
+            position={tooltipPosition}
           />
-        )}
-        {showForceStop && (
-          <ForceStopModal
-            chainName={chain.display_name}
-            onConfirm={handleForceStop}
-            onClose={() => setShowForceStop(false)}
-          />
-        )}
+        </div>
       </div>
-    </div>
+      {showSettings && (
+        <ChainSettingsModal
+          chain={fullChainData}
+          onClose={() => setShowSettings(false)}
+          onOpenDataDir={handleOpenDataDir}
+          onOpenWalletDir={onOpenWalletDir}
+          onReset={onReset}
+        />
+      )}
+      {showForceStop && (
+        <ForceStopModal
+          chainName={chain.display_name}
+          onConfirm={handleForceStop}
+          onClose={() => setShowForceStop(false)}
+          dependentChains={getRunningDependents().map(id => {
+            const chainData = window.cardData.find(c => c.id === id);
+            return chainData?.display_name || id;
+          })}
+        />
+      )}
+    </>
   );
 };
 

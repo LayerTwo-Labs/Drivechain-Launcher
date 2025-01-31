@@ -57,15 +57,16 @@ const ChainSettingsModal = ({
                 href={chain.repo_url}
                 onClick={handleOpenRepo}
                 className={styles.link}
+                title={chain.repo_url}
               >
-                {chain.repo_url}
+                <span className={styles.linkText}>{chain.repo_url}</span>
                 <ExternalLink size={14} className={styles.externalIcon} />
               </a>
             </div>
             <div className={styles.infoRow}>
               <span className={styles.label}>Wallet Directory:</span>
-              <span className={styles.dataDir}>
-                {chain.walletDir}
+              <span className={styles.dataDir} title={chain.walletDir}>
+                <span className={styles.pathText}>{chain.walletDir}</span>
                 <button
                   className={styles.dirButton}
                   onClick={() => onOpenWalletDir(chain.id)}
@@ -77,8 +78,8 @@ const ChainSettingsModal = ({
             </div>
             <div className={styles.infoRow}>
               <span className={styles.label}>Data Directory:</span>
-              <span className={styles.dataDir}>
-                {chain.dataDir}
+              <span className={styles.dataDir} title={chain.dataDir}>
+                <span className={styles.pathText}>{chain.dataDir}</span>
                 <button
                   className={styles.dirButton}
                   onClick={() => onOpenDataDir(chain.id)}
@@ -90,8 +91,8 @@ const ChainSettingsModal = ({
             </div>
             <div className={styles.infoRow}>
               <span className={styles.label}>Binary Directory:</span>
-              <span className={styles.dataDir}>
-                {chain.binaryDir}
+              <span className={styles.dataDir} title={chain.binaryDir}>
+                <span className={styles.pathText}>{chain.binaryDir}</span>
                 <button
                   className={styles.dirButton}
                   onClick={() => window.electronAPI.openBinaryDir(chain.id)}

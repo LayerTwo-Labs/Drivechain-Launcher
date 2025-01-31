@@ -2,6 +2,11 @@
   "name": "drivechain-launcher",
   "version": "0.1.0",
   "private": true,
+  "description": "Drivechain Launcher Application",
+  "author": {
+    "name": "Drivechain",
+    "email": "support@drivechain.info"
+  },
   "main": "public/electron.js",
   "homepage": "./",
   "dependencies": {
@@ -20,8 +25,6 @@
     "bitcoinjs-lib": "^6.1.7",
     "concurrently": "^8.2.2",
     "cross-env": "^7.0.3",
-    "electron": "^28.1.0",
-    "electron-builder": "^24.9.1",
     "electron-dl": "^4.0.0",
     "electron-is-dev": "^2.0.0",
     "electron-store": "^10.0.0",
@@ -74,7 +77,43 @@
       "last 1 safari version"
     ]
   },
+  "build": {
+    "appId": "com.drivechain.launcher",
+    "productName": "Drivechain Launcher",
+    "files": [
+      "build/**/*",
+      "public/**/*"
+    ],
+    "directories": {
+      "buildResources": "public"
+    },
+    "linux": {
+      "target": ["deb", "tar.gz"],
+      "category": "Development",
+      "maintainer": "Drivechain <support@drivechain.info>",
+      "asarUnpack": ["**/chrome-sandbox"],
+      "executableName": "drivechain-launcher",
+      "executableArgs": ["--no-sandbox"],
+      "artifactName": "Drivechain-Launcher-${version}-${arch}.${ext}"
+    },
+    "win": {
+      "target": "nsis",
+      "artifactName": "Drivechain-Launcher-Setup-${version}.${ext}"
+    },
+    "mac": {
+      "target": [
+        {
+          "target": "dmg",
+          "arch": ["x64", "arm64"]
+        }
+      ],
+      "category": "public.app-category.developer-tools",
+      "artifactName": "Drivechain-Launcher-${version}-${arch}.${ext}"
+    }
+  },
   "devDependencies": {
+    "electron": "^28.1.0",
+    "electron-builder": "^24.9.1",
     "@babel/plugin-proposal-private-property-in-object": "^7.21.11",
     "@babel/plugin-transform-modules-commonjs": "^7.26.3",
     "@babel/preset-env": "^7.26.0",

@@ -2,7 +2,7 @@ import React from 'react';
 import { useTheme } from '../contexts/ThemeContext';
 import styles from './ForceStopModal.module.css';
 
-const ForceStopModal = ({ chainName, onConfirm, onClose }) => {
+const ForceStopModal = ({ chainName, onConfirm, onClose, dependentChains = [] }) => {
   const { isDarkMode } = useTheme();
 
   return (
@@ -10,8 +10,16 @@ const ForceStopModal = ({ chainName, onConfirm, onClose }) => {
       <div className={styles.modalContent}>
         <h2>Warning: Force Stop {chainName}</h2>
         <p>
-          Force stopping {chainName} may result in data corruption or loss.
-          Only use this if the normal stop operation is not responding.
+          Warning: The following chains depend on {chainName}:
+        </p>
+        <ul className={styles.dependentList}>
+          {dependentChains.map((name, index) => (
+            <li key={index}>{name}</li>
+          ))}
+        </ul>
+        <p>
+          Force stopping {chainName} will affect these dependent chains and may result in data corruption or loss.
+          Are you sure you want to proceed?
         </p>
         <div className={styles.buttonContainer}>
           <button 

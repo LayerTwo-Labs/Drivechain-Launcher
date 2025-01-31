@@ -61,11 +61,13 @@
   grid-template-columns: 140px 1fr;
   align-items: center;
   gap: 10px;
+  text-align: left;
 }
 
 .label {
   color: var(--text-color);
   font-weight: 500;
+  text-align: left;
 }
 
 .dataDir {
@@ -74,7 +76,14 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  word-break: break-all;
+  min-width: 0;
+}
+
+.pathText {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  flex: 1;
 }
 
 .link {
@@ -83,8 +92,14 @@
   opacity: 0.8;
   display: flex;
   align-items: center;
-  gap: 8px;
-  word-break: break-all;
+  min-width: 0;
+}
+
+.linkText {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  flex: 1;
 }
 
 .link:hover {
@@ -93,6 +108,8 @@
 
 .externalIcon {
   flex-shrink: 0;
+  margin-left: 8px;
+  padding: 5px;
 }
 
 .dirButton {
@@ -115,6 +132,7 @@
   display: flex;
   justify-content: flex-end;
   margin-top: 20px;
+  gap: 8px;
 }
 
 .resetBtn {

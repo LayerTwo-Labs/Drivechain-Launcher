@@ -10,10 +10,46 @@ const WalletModal = () => {
   const [revealedMnemonics, setRevealedMnemonics] = useState({
     master: false,
     layer1: false,
-    layer2: false
+    layer2_thunder: false,
+    layer2_bitnames: false
+  });
+  const [mnemonics, setMnemonics] = useState({
+    master: '••••••••••••',
+    layer1: '••••••••••••',
+    layer2_thunder: '••••••••••••',
+    layer2_bitnames: '••••••••••••'
   });
 
-  const toggleMnemonic = (key) => {
+  const toggleMnemonic = async (key) => {
+    // Only fetch if we're revealing and haven't fetched before
+    if (!revealedMnemonics[key] && mnemonics[key] === '••••••••••••') {
+      try {
+        let type;
+        switch (key) {
+          case 'master':
+            type = 'master';
+            break;
+          case 'layer1':
+            type = 'layer1';
+            break;
+          case 'layer2_thunder':
+            type = 'thunder';
+            break;
+          case 'layer2_bitnames':
+            type = 'bitnames';
+            break;
+        }
+        const result = await window.electronAPI.getWalletStarter(type);
+        if (result.success) {
+          setMnemonics(prev => ({
+            ...prev,
+            [key]: result.data
+          }));
+        }
+      } catch (error) {
+        console.error('Error fetching mnemonic:', error);
+      }
+    }
     setRevealedMnemonics(prev => ({
       ...prev,
       [key]: !prev[key]
@@ -56,7 +92,7 @@ const WalletModal = () => {
           <div className={styles.tableRow}>
             <div className={styles.starterCol}>Master</div>
             <div className={styles.mnemonicCol}>
-              {revealedMnemonics.master ? 'abandon ability able about above absent absorb abstract absurd abuse access accident' : '••••••••••••'}
+              {revealedMnemonics.master ? mnemonics.master : '••••••••••••'}
             </div>
             <div className={styles.actionsCol}>
               <button 
@@ -66,9 +102,11 @@ const WalletModal = () => {
               >
                 {revealedMnemonics.master ? <EyeOff size={18} /> : <Eye size={18} />}
               </button>
+              {/* Delete functionality not yet implemented
               <button className={styles.deleteIconButton} title="Delete Starter">
                 <Trash2 size={18} />
               </button>
+              */}
             </div>
           </div>
 
@@ -81,7 +119,7 @@ const WalletModal = () => {
           <div className={styles.tableRow}>
             <div className={styles.starterCol}>Bitcoin Core (Patched)</div>
             <div className={styles.mnemonicCol}>
-              {revealedMnemonics.layer1 ? 'abandon ability able about above absent absorb abstract absurd abuse access accident account acid acquire across act action actor adapt add addict address adjust advance' : '••••••••••••'}
+              {revealedMnemonics.layer1 ? mnemonics.layer1 : '••••••••••••'}
             </div>
             <div className={styles.actionsCol}>
               <button 
@@ -91,9 +129,11 @@ const WalletModal = () => {
               >
                 {revealedMnemonics.layer1 ? <EyeOff size={18} /> : <Eye size={18} />}
               </button>
+              {/* Delete functionality not yet implemented
               <button className={styles.deleteIconButton} title="Delete Starter">
                 <Trash2 size={18} />
               </button>
+              */}
             </div>
           </div>
 
@@ -104,21 +144,44 @@ const WalletModal = () => {
             <div className={styles.actionsCol}></div>
           </div>
           <div className={styles.tableRow}>
-            <div className={styles.starterCol}>Lightning</div>
+            <div className={styles.starterCol}>Thunder</div>
             <div className={styles.mnemonicCol}>
-              {revealedMnemonics.layer2 ? 'abandon ability able about above absent absorb abstract absurd abuse access accident' : '••••••••••••'}
+              {revealedMnemonics.layer2_thunder ? mnemonics.layer2_thunder : '••••••••••••'}
             </div>
             <div className={styles.actionsCol}>
               <button 
                 className={styles.iconButton} 
-                title={revealedMnemonics.layer2 ? "Hide" : "Reveal"}
-                onClick={() => toggleMnemonic('layer2')}
+                title={revealedMnemonics.layer2_thunder ? "Hide" : "Reveal"}
+                onClick={() => toggleMnemonic('layer2_thunder')}
               >
-                {revealedMnemonics.layer2 ? <EyeOff size={18} /> : <Eye size={18} />}
+                {revealedMnemonics.layer2_thunder ? <EyeOff size={18} /> : <Eye size={18} />}
               </button>
+              {/* Delete functionality not yet implemented
               <button className={styles.deleteIconButton} title="Delete Starter">
                 <Trash2 size={18} />
               </button>
+              */}
+            </div>
+          </div>
+
+          <div className={styles.tableRow}>
+            <div className={styles.starterCol}>Bitnames</div>
+            <div className={styles.mnemonicCol}>
+              {revealedMnemonics.layer2_bitnames ? mnemonics.layer2_bitnames : '••••••••••••'}
+            </div>
+            <div className={styles.actionsCol}>
+              <button 
+                className={styles.iconButton} 
+                title={revealedMnemonics.layer2_bitnames ? "Hide" : "Reveal"}
+                onClick={() => toggleMnemonic('layer2_bitnames')}
+              >
+                {revealedMnemonics.layer2_bitnames ? <EyeOff size={18} /> : <Eye size={18} />}
+              </button>
+              {/* Delete functionality not yet implemented
+              <button className={styles.deleteIconButton} title="Delete Starter">
+                <Trash2 size={18} />
+              </button>
+              */}
             </div>
           </div>
 

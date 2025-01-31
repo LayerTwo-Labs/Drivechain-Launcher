@@ -16,6 +16,8 @@
   --stop-btn-hover: #c82333;
   --downloading-btn: #ffa500;
   --downloading-btn-hover: #cc8400;
+  --stopping-btn: #ff6b6b;
+  --stopping-btn-hover: #ff4f4f;
   --modal-bg: #f0f0f0;
   --modal-text: #333;
   --download-item-bg: #fff;
@@ -40,6 +42,8 @@
   --stop-btn-hover: #a71d2a;
   --downloading-btn: #cc8400;
   --downloading-btn-hover: #b37400;
+  --stopping-btn: #e64545;
+  --stopping-btn-hover: #d13030;
   --modal-bg: #444444;
   --modal-text: #ffffff;
   --download-item-bg: #555555;
@@ -88,6 +92,21 @@ body {
   display: flex;
   flex-direction: column;
   color: var(--text-color);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+}
+
+.dark .card {
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+}
+
+.dark .card:hover {
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.4);
 }
 
 .card-header {
@@ -139,7 +158,12 @@ body {
   font-size: 0.9rem;
   text-align: center;
   color: white;
-  transition: background-color 0.2s ease;
+  transition: background-color 0.2s ease, opacity 0.2s ease;
+}
+
+.btn:disabled {
+  cursor: wait;
+  opacity: 0.8;
 }
 
 .settings-icon-button {
@@ -207,6 +231,13 @@ body {
   background-color: var(--stop-btn-hover);
 }
 
+.stopping {
+  background-color: var(--stopping-btn);
+}
+.stopping:hover {
+  background-color: var(--stopping-btn-hover);
+}
+
 .settings {
   background-color: var(--btn-bg);
   color: var(--btn-text);
@@ -262,6 +293,59 @@ body {
 
 .quick-start-button:hover {
   background-color: var(--run-btn-hover);
+}
+
+/* Shimmering effect for download button */
+.btn-shimmer {
+  --border-width: 1px;
+  --border-radius: 4px;
+  position: relative;
+  border: var(--border-width) solid transparent;
+  isolation: isolate;
+}
+
+.btn-shimmer::before {
+  content: "";
+  position: absolute;
+  inset: calc(var(--border-width) * -1);
+  z-index: -1;
+  border: inherit;
+  border-radius: inherit;
+  background: linear-gradient(90deg,
+    var(--current-color, var(--download-btn)) 0%,
+    rgba(255, 255, 255, 0.9) 25%,
+    var(--current-color, var(--download-btn)) 50%,
+    var(--current-color, var(--download-btn)) 100%
+  );
+  background-size: 200% 100%;
+  -webkit-mask: 
+    linear-gradient(#fff 0 0) content-box,
+    linear-gradient(#fff 0 0);
+  mask: 
+    linear-gradient(#fff 0 0) content-box,
+    linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  animation: shine 1s linear infinite;
+}
+
+@keyframes shine {
+  to {
+    background-position: -200% 0;
+  }
+}
+
+.btn-shimmer:disabled::before {
+  animation: none;
+}
+
+/* Set gradient color based on button state */
+.btn-shimmer[data-state="download"] {
+  --current-color: var(--download-btn);
+}
+
+.btn-shimmer[data-state="start"] {
+  --current-color: var(--run-btn);
 }
 
 /* L1 Chain Layout */

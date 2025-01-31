@@ -7,8 +7,6 @@ import walletModalReducer from './walletModalSlice';
 import fastWithdrawalModalReducer from './fastWithdrawalModalSlice';
 import settingsModalReducer from './settingsModalSlice';
 import settingsReducer from './settingsSlice';
-import updateReducer from './updateSlice';
-
 export const store = configureStore({
   reducer: {
     downloads: downloadReducer,
@@ -19,6 +17,5 @@ export const store = configureStore({
     fastWithdrawalModal: fastWithdrawalModalReducer,
     settingsModal: settingsModalReducer,
     settings: settingsReducer,
-    updates: updateReducer,
   },
 });

@@ -1,4 +1,11 @@
 const { app, BrowserWindow, ipcMain, shell } = require("electron");
+
+// Disable sandbox for Linux
+if (process.platform === 'linux') {
+  app.commandLine.appendSwitch('no-sandbox');
+  app.commandLine.appendSwitch('disable-setuid-sandbox');
+  process.env.ELECTRON_DISABLE_SANDBOX = '1';
+}
 const path = require("path");
 const fs = require("fs-extra");
 const isDev = require("electron-is-dev");
@@ -42,6 +49,7 @@ function createWindow() {
         contextIsolation: true,
         nodeIntegration: false,
         preload: path.join(__dirname, "preload.js"),
+        sandbox: false
       },
     });
     mainWindow.loadURL(
@@ -304,6 +312,40 @@ function setupIPCHandlers() {
     }
   });
 
+  // Get wallet starter data
+  ipcMain.handle("get-wallet-starter", async (event, type) => {
+    try {
+      const walletDir = path.join(app.getPath('userData'), 'wallet_starters');
+      let filePath;
+      
+      switch (type) {
+        case 'master':
+          filePath = path.join(walletDir, 'master_starter.json');
+          break;
+        case 'layer1':
+          filePath = path.join(walletDir, 'l1_starter.json');
+          break;
+        case 'thunder':
+          filePath = path.join(walletDir, 'sidechain_9_starter.json');
+          break;
+        case 'bitnames':
+          filePath = path.join(walletDir, 'sidechain_2_starter.json');
+          break;
+        default:
+          throw new Error('Invalid wallet type');
+      }
+
+      if (await fs.pathExists(filePath)) {
+        const data = await fs.readJson(filePath);
+        return { success: true, data: data.mnemonic };
+      }
+      return { success: false, error: 'Wallet starter not found' };
+    } catch (error) {
+      console.error('Error reading wallet starter:', error);
+      return { success: false, error: error.message };
+    }
+  });
+
   // Advanced wallet handlers
   ipcMain.handle("preview-wallet", async (event, options) => {
     try {
@@ -347,6 +389,47 @@ function setupIPCHandlers() {
     return await updateManager.checkForUpdates();
   });
 
+  ipcMain.handle("apply-updates", async (event, chainIds) => {
+    try {
+      // First stop any running chains
+      for (const chainId of chainIds) {
+        const status = await chainManager.getChainStatus(chainId);
+        if (status === 'running' || status === 'ready') {
+          await chainManager.stopChain(chainId);
+        }
+      }
+
+      // Delete existing binaries and download updates
+      for (const chainId of chainIds) {
+        const chain = config.chains.find(c => c.id === chainId);
+        if (!chain) continue;
+
+        // Get extract path
+        const platform = process.platform;
+        const extractDir = chain.extract_dir?.[platform];
+        if (!extractDir) continue;
+
+        const downloadsDir = app.getPath("downloads");
+        const extractPath = path.join(downloadsDir, extractDir);
+
+        // Delete existing binary directory
+        await fs.remove(extractPath);
+
+        // Download and extract new binary
+        const url = chain.download.urls[platform];
+        if (!url) continue;
+
+        await fs.ensureDir(extractPath);
+        downloadManager.startDownload(chainId, url, extractPath);
+      }
+
+      return { success: true };
+    } catch (error) {
+      console.error('Failed to apply updates:', error);
+      return { success: false, error: error.message };
+    }
+  });
+
   ipcMain.handle("get-balance-btc", async (event, options) => {
     try {
       return await fastWithdrawalManager.getBalanceBTC();
@@ -384,33 +467,74 @@ function setupIPCHandlers() {
     }
   });
 
+  // Wallet directory handlers
+  ipcMain.handle("delete-wallet-starters-dir", async () => {
+    try {
+      const walletDir = path.join(app.getPath('userData'), 'wallet_starters');
+      if (await fs.pathExists(walletDir)) {
+        await fs.remove(walletDir);
+      }
+      return { success: true };
+    } catch (error) {
+      console.error('Failed to delete wallet starters directory:', error);
+      return { success: false, error: error.message };
+    }
+  });
+
+  ipcMain.handle("init-wallet-dirs", async () => {
+    try {
+      const walletDir = path.join(app.getPath('userData'), 'wallet_starters');
+      const mnemonicsDir = path.join(walletDir, 'mnemonics');
+      await fs.ensureDir(walletDir);
+      await fs.ensureDir(mnemonicsDir);
+      return { success: true };
+    } catch (error) {
+      console.error('Failed to initialize wallet directories:', error);
+      return { success: false, error: error.message };
+    }
+  });
+
   ipcMain.handle('force-kill', () => {
     forceKillAllProcesses();
   });
 }
 
-app.whenReady().then(async () => {
-  await loadConfig();
-  
-  // Initialize managers
-  directoryManager = new DirectoryManager(config);
-  await directoryManager.setupChainDirectories();
-  
-  const configManager = new ConfigManager(configPath);
-  await configManager.loadConfig();
-  await configManager.setupExtractDirectories();
-  
-  createWindow();
-  
-  chainManager = new ChainManager(mainWindow, config);
-  walletManager = new WalletManager(config);
-  fastWithdrawalManager = new FastWithdrawalManager();
-  apiManager = new ApiManager();
-  updateManager = new UpdateManager(config, chainManager);
-  downloadManager = new DownloadManager(mainWindow, config);
-  
-  setupIPCHandlers();
-});
+async function initialize() {
+  try {
+    await loadConfig();
+    
+    // Initialize managers that don't depend on mainWindow
+    directoryManager = new DirectoryManager(config);
+    await directoryManager.setupChainDirectories();
+    
+    const configManager = new ConfigManager(configPath);
+    await configManager.loadConfig();
+    await configManager.setupExtractDirectories();
+    
+    walletManager = new WalletManager(config);
+    fastWithdrawalManager = new FastWithdrawalManager();
+    apiManager = new ApiManager();
+    
+    // Create window first
+    createWindow();
+    
+    // Then initialize managers that need mainWindow
+    chainManager = new ChainManager(mainWindow, config);
+    updateManager = new UpdateManager(config, chainManager);
+    downloadManager = new DownloadManager(mainWindow, config);
+    
+    // Finally setup IPC handlers after everything is initialized
+    setupIPCHandlers();
+  } catch (error) {
+    console.error('Initialization error:', error);
+    app.quit();
+  }
+}
+
+// Disable sandbox
+app.commandLine.appendSwitch('no-sandbox');
+
+app.whenReady().then(initialize);
 
 let isShuttingDown = false;
 let forceKillTimeout;

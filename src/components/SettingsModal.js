@@ -1,21 +1,23 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { hideSettingsModal } from '../store/settingsModalSlice';
 import { toggleShowQuotes } from '../store/settingsSlice';
-import { setAvailableUpdates, setIsChecking, setLastChecked, setError } from '../store/updateSlice';
 import { useTheme } from '../contexts/ThemeContext';
 import styles from './SettingsModal.module.css';
 import { X } from 'lucide-react';
 import ResetAllModal from './ResetAllModal';
+import UpdateConfirmModal from './UpdateConfirmModal';
 
-const SettingsModal = () => {
+const SettingsModal = ({ onResetComplete }) => {
   const [showResetModal, setShowResetModal] = useState(false);
+  const [updateStatus, setUpdateStatus] = useState(null);
+  const [isCheckingUpdates, setIsCheckingUpdates] = useState(false);
+  const [availableUpdates, setAvailableUpdates] = useState([]);
+  const [showUpdateConfirm, setShowUpdateConfirm] = useState(false);
   const dispatch = useDispatch();
   const { isVisible } = useSelector((state) => state.settingsModal);
   const { showQuotes } = useSelector((state) => state.settings);
   const { isDarkMode, toggleTheme } = useTheme();
-  const { isChecking, lastChecked } = useSelector((state) => state.updates);
-
   const handleClose = () => {
     dispatch(hideSettingsModal());
   };
@@ -26,29 +28,19 @@ const SettingsModal = () => {
     }
   };
 
-  const handleCheckUpdates = async () => {
-    try {
-      dispatch(setIsChecking(true));
-      const result = await window.electronAPI.checkForUpdates();
-      if (result.success) {
-        dispatch(setAvailableUpdates(result.updates));
-        dispatch(setLastChecked(Date.now()));
-      } else {
-        dispatch(setError(result.error));
-      }
-    } catch (error) {
-      dispatch(setError(error.message));
-    } finally {
-      dispatch(setIsChecking(false));
-    }
-  };
-
   const handleReset = async () => {
     setShowResetModal(true);
   };
 
   const handleConfirmReset = async () => {
     try {
+      // Delete wallet starters directory first
+      await window.electronAPI.invoke('delete-wallet-starters-dir');
+      
+      // Recreate wallet starters directories
+      await window.electronAPI.invoke('init-wallet-dirs');
+
+      // Then handle chain resets
       const chains = await window.electronAPI.getConfig();
       for (const chain of chains.chains) {
         if (chain.enabled) {
@@ -63,6 +55,7 @@ const SettingsModal = () => {
       }
       setShowResetModal(false);
       handleClose(); // Close the settings modal after reset
+      onResetComplete(); // Show the welcome modal
     } catch (error) {
       console.error('Failed to reset all chains:', error);
     }
@@ -94,17 +87,6 @@ const SettingsModal = () => {
           </div>
 
           <div className={styles.settingRow}>
-            <span className={styles.settingLabel}>Show Logs</span>
-            <label className={styles.toggleSwitch}>
-              <input
-                type="checkbox"
-                onChange={() => console.log('Show logs toggled')}
-              />
-              <span className={styles.slider}></span>
-            </label>
-          </div>
-
-          <div className={styles.settingRow}>
             <span className={styles.settingLabel}>Dark Mode</span>
             <label className={styles.toggleSwitch}>
               <input
@@ -115,21 +97,6 @@ const SettingsModal = () => {
               <span className={styles.slider}></span>
             </label>
           </div>
-        </div>
-
-        <div className={styles.updateSection}>
-          <button 
-            className={styles.updateButton} 
-            onClick={handleCheckUpdates}
-            disabled={isChecking}
-          >
-            {isChecking ? 'Checking...' : 'Check for Updates'}
-          </button>
-          {lastChecked && (
-            <span className={styles.lastChecked}>
-              Last checked: {new Date(lastChecked).toLocaleTimeString()}
-            </span>
-          )}
         </div>
 
         <div className={styles.settingGroup}>
@@ -151,6 +118,50 @@ const SettingsModal = () => {
               Open
             </button>
           </div>
+
+          <div className={styles.settingRow}>
+            <span className={styles.settingLabel}>Check for Updates</span>
+            <button 
+              className={styles.updateButton}
+              onClick={async () => {
+                try {
+                  setIsCheckingUpdates(true);
+                  setUpdateStatus('Checking for updates...');
+                  const result = await window.electronAPI.invoke('check-for-updates');
+                  
+                  if (!result.success) {
+                    throw new Error(result.error);
+                  }
+
+                  const updates = Object.entries(result.updates)
+                    .filter(([_, update]) => update.has_update)
+                    .map(([id, update]) => update.displayName);
+
+                  if (updates.length === 0) {
+                    setUpdateStatus('All chains are up to date');
+                    setAvailableUpdates([]);
+                  } else {
+                    setUpdateStatus(`Updates available for: ${updates.join(', ')}`);
+                    setAvailableUpdates(updates);
+                    setShowUpdateConfirm(true);
+                  }
+                } catch (error) {
+                  console.error('Error checking for updates:', error);
+                  setUpdateStatus(`Error checking for updates: ${error.message}`);
+                } finally {
+                  setIsCheckingUpdates(false);
+                }
+              }}
+              disabled={isCheckingUpdates}
+            >
+              {isCheckingUpdates ? 'Checking...' : 'Check Now'}
+            </button>
+          </div>
+          {updateStatus && (
+            <div className={styles.updateStatus}>
+              {updateStatus}
+            </div>
+          )}
         </div>
 
         <button className={styles.resetButton} onClick={handleReset}>
@@ -161,6 +172,35 @@ const SettingsModal = () => {
         <ResetAllModal
           onConfirm={handleConfirmReset}
           onClose={() => setShowResetModal(false)}
+        />
+      )}
+      {showUpdateConfirm && (
+        <UpdateConfirmModal
+          updates={availableUpdates}
+          onConfirm={async () => {
+            try {
+              setUpdateStatus('Applying updates...');
+              // Get config to map display names to chain IDs
+              const config = await window.electronAPI.invoke('get-config');
+              const chainIds = availableUpdates.map(name => {
+                const chain = config.chains.find(c => c.display_name === name);
+                return chain ? chain.id : null;
+              }).filter(Boolean);
+
+              const result = await window.electronAPI.invoke('apply-updates', chainIds);
+
+              if (!result.success) {
+                throw new Error(result.error);
+              }
+
+              setUpdateStatus('Updates are being applied. Please wait for the process to complete.');
+              setShowUpdateConfirm(false);
+            } catch (error) {
+              console.error('Failed to apply updates:', error);
+              setUpdateStatus(`Error applying updates: ${error.message}`);
+            }
+          }}
+          onClose={() => setShowUpdateConfirm(false)}
         />
       )}
     </div>
