@@ -17,43 +17,17 @@ function Nodes() {
   const [isInitialized, setIsInitialized] = useState(false);
   const dispatch = useDispatch();
 
-  const fetchChains = useCallback(async () => {
-    try {
-      const config = await window.electronAPI.getConfig();
-      const dependencyData = await import('../CardData.json');
-      
-      const chainsWithStatus = await Promise.all(
-        config.chains
-          .filter(chain => chain.enabled)
-          .map(async chain => {
-            const dependencyInfo = dependencyData.default.find(d => d.id === chain.id);
-            console.log('Loading chain:', chain.id, 'Released status:', chain.released);
-            return {
-              ...chain,
-              dependencies: dependencyInfo?.dependencies || [],
-              status: await window.electronAPI.getChainStatus(chain.id),
-              progress: 0,
-              released: chain.released, // Explicitly preserve released status
-            };
-          })
-      );
-      dispatch(setChains(chainsWithStatus));
-      
-      // Initialize running nodes based on initial status
-      const initialRunning = chainsWithStatus
-        .filter(chain => chain.status === 'running' || chain.status === 'ready')
-        .map(chain => chain.id);
-      setRunningNodes(initialRunning);
-      setIsInitialized(true);
-    } catch (error) {
-      console.error('Failed to fetch chain config:', error);
-      setIsInitialized(true); // Still set initialized even on error to prevent infinite loading
-    }
-  }, [dispatch]);
+  // Initialize running nodes based on current chain statuses
+  useEffect(() => {
+    const initialRunning = chains
+      .filter(chain => chain.status === 'running' || chain.status === 'ready')
+      .map(chain => chain.id);
+    setRunningNodes(initialRunning);
+    setIsInitialized(true);
+  }, [chains]);
 
   const downloadsUpdateHandler = useCallback(
     downloads => {
-      console.log('Received downloads update:', downloads);
       dispatch(updateDownloads(downloads));
       downloads.forEach(download => {
         dispatch(updateChainStatus({
@@ -86,8 +60,6 @@ function Nodes() {
   }, [dispatch]);
 
   useEffect(() => {
-    fetchChains();
-
     const unsubscribeDownloadsUpdate = window.electronAPI.onDownloadsUpdate(
       downloadsUpdateHandler
     );
@@ -100,7 +72,6 @@ function Nodes() {
     const unsubscribeBitcoinSync = window.electronAPI.onBitcoinSyncStatus(
       (status) => {
         setBitcoinSync(status);
-        // Update IBD status in downloads slice
         dispatch(updateIBDStatus({ chainId: 'bitcoin', status }));
       }
     );
@@ -117,10 +88,10 @@ function Nodes() {
         unsubscribeBitcoinSync();
     };
   }, [
-    fetchChains,
     downloadsUpdateHandler,
     chainStatusUpdateHandler,
     downloadCompleteHandler,
+    dispatch
   ]);
 
   const handleOpenWalletDir = useCallback(async chainId => {
@@ -134,10 +105,6 @@ function Nodes() {
         });
       }
     } catch (error) {
-      console.error(
-        `Failed to open wallet directory for chain ${chainId}:`,
-        error
-      );
       setWalletMessage({
         error: error.message,
         path: '',
@@ -153,12 +120,10 @@ function Nodes() {
   const handleDownloadChain = useCallback(
     async chainId => {
       try {
-        console.log(`Attempting to download chain ${chainId}`);
         await window.electronAPI.downloadChain(chainId);
-        console.log(`Download initiated for chain ${chainId}`);
         dispatch(showDownloadModal());
       } catch (error) {
-        console.error(`Failed to start download for chain ${chainId}:`, error);
+        console.error(`Failed to start download for chain ${chainId}`);
       }
     },
     [dispatch]
@@ -166,26 +131,18 @@ function Nodes() {
 
   const handleStartChain = useCallback(async chainId => {
     try {
-      // Find the chain and check its dependencies
       const chain = chains.find(c => c.id === chainId);
-      if (!chain) {
-        console.error(`Chain ${chainId} not found`);
-        return;
-      }
+      if (!chain) return;
 
-      // Check if all dependencies are running
-      if (chain.dependencies && chain.dependencies.length > 0) {
+      if (chain.dependencies?.length > 0) {
         const missingDeps = chain.dependencies.filter(dep => !runningNodes.includes(dep));
-        if (missingDeps.length > 0) {
-          console.error(`Cannot start ${chainId}: missing dependencies: ${missingDeps.join(', ')}`);
-          return;
-        }
+        if (missingDeps.length > 0) return;
       }
 
       await window.electronAPI.startChain(chainId);
       dispatch(updateChainStatus({ chainId, status: 'running' }));
     } catch (error) {
-      console.error(`Failed to start chain ${chainId}:`, error);
+      console.error(`Failed to start chain ${chainId}`);
     }
   }, [chains, runningNodes, dispatch]);
 
@@ -194,7 +151,7 @@ function Nodes() {
       await window.electronAPI.stopChain(chainId);
       dispatch(updateChainStatus({ chainId, status: 'stopped' }));
     } catch (error) {
-      console.error(`Failed to stop chain ${chainId}:`, error);
+      console.error(`Failed to stop chain ${chainId}`);
     }
   }, [dispatch]);
 
@@ -205,7 +162,6 @@ function Nodes() {
         try {
           await handleStopChain(chainId);
         } catch (error) {
-          console.error(`Failed to stop chain ${chainId} before reset:`, error);
           return;
         }
       }
@@ -213,7 +169,7 @@ function Nodes() {
       try {
         await window.electronAPI.resetChain(chainId);
       } catch (error) {
-        console.error(`Failed to reset chain ${chainId}:`, error);
+        console.error(`Failed to reset chain ${chainId}`);
       }
     },
     [chains, handleStopChain]
@@ -225,7 +181,7 @@ function Nodes() {
         if (runningNodes.includes(chainId)) {
           resolve();
         } else {
-          setTimeout(checkRunning, 500); // Check every 500ms
+          setTimeout(checkRunning, 500);
         }
       };
       checkRunning();
@@ -272,7 +228,7 @@ function Nodes() {
         }
       }
     } catch (error) {
-      console.error('Failed to download L1 chains:', error);
+      console.error('Failed to download L1 chains');
     }
   }, [chains, handleDownloadChain]);
 
@@ -281,7 +237,6 @@ function Nodes() {
       setIsProcessing(true);
       setIsStoppingSequence(false);
       
-      // Start chains with fixed delays between each
       if (!runningNodes.includes('bitcoin')) {
         await window.electronAPI.startChain('bitcoin');
         await new Promise(resolve => setTimeout(resolve, 3000));
@@ -296,13 +251,12 @@ function Nodes() {
         await window.electronAPI.startChain('bitwindow');
       }
     } catch (error) {
-      console.error('Start sequence failed:', error);
+      console.error('Start sequence failed');
     } finally {
       setIsProcessing(false);
     }
   }, [runningNodes]);
 
-  // Reset processing state when bitcoin status changes to stopped
   useEffect(() => {
     const bitcoinChain = chains.find(c => c.id === 'bitcoin');
     if (bitcoinChain?.status === 'stopped' && isStoppingSequence) {
@@ -316,7 +270,6 @@ function Nodes() {
       setIsProcessing(true);
       setIsStoppingSequence(true);
       
-      // First stop any running L2 chains
       for (const chainId of L2_CHAINS) {
         if (runningNodes.includes(chainId)) {
           await window.electronAPI.stopChain(chainId);
@@ -324,7 +277,6 @@ function Nodes() {
         }
       }
       
-      // Then stop L1 chains in reverse order
       if (runningNodes.includes('bitwindow')) {
         await window.electronAPI.stopChain('bitwindow');
         await new Promise(resolve => setTimeout(resolve, 3000));
@@ -337,7 +289,7 @@ function Nodes() {
         await window.electronAPI.stopChain('bitcoin');
       }
     } catch (error) {
-      console.error('Stop sequence failed:', error);
+      console.error('Stop sequence failed');
       setIsProcessing(false);
       setIsStoppingSequence(false);
     }
@@ -353,7 +305,7 @@ function Nodes() {
         await handleStopSequence();
       }
     } catch (error) {
-      console.error('Quick start/stop failed:', error);
+      console.error('Quick start/stop failed');
     }
   }, [areAllL1ChainsDownloaded, areAllChainsRunning, downloadMissingL1Chains, handleStartSequence, handleStopSequence]);
 
@@ -372,24 +324,24 @@ function Nodes() {
                 style={{
                   padding: '8px 16px',
                   backgroundColor: isProcessing || isAnyL1ChainDownloading()
-                    ? 'var(--downloading-btn)'  // Orange for processing/downloading
+                    ? 'var(--downloading-btn)'
                     : !areAllL1ChainsDownloaded()
-                      ? 'var(--download-btn)'  // Blue for download
+                      ? 'var(--download-btn)'
                       : areAllChainsRunning()
-                        ? 'var(--stop-btn)'  // Red for stop
-                        : 'var(--run-btn)', // Green for start
+                        ? 'var(--stop-btn)'
+                        : 'var(--run-btn)',
                   cursor: (isProcessing || isAnyL1ChainDownloading()) ? 'wait' : 'pointer',
                   opacity: (isProcessing || isAnyL1ChainDownloading()) ? 0.8 : 1,
-                  width: 'auto',  // Override fixed width from btn class
+                  width: 'auto',
                   transition: 'background-color 0.2s ease',
                   ':hover': {
                     backgroundColor: isProcessing || isAnyL1ChainDownloading()
-                      ? 'var(--downloading-btn-hover)'  // Darker orange for processing/downloading
+                      ? 'var(--downloading-btn-hover)'
                       : !areAllL1ChainsDownloaded()
-                        ? 'var(--download-btn-hover)'  // Darker blue for download
+                        ? 'var(--download-btn-hover)'
                         : areAllChainsRunning()
-                          ? 'var(--stop-btn-hover)'  // Darker red for stop
-                          : 'var(--run-btn-hover)'  // Darker green for start
+                          ? 'var(--stop-btn-hover)'
+                          : 'var(--run-btn-hover)'
                   }
                 }}
               >
@@ -408,8 +360,7 @@ function Nodes() {
           <div className="l1-chains">
             {chains
               .filter(chain => chain.chain_type === 0)
-              .map(chain => (
-                console.log('Chain:', chain.id, 'Released:', chain.released),
+              .map(chain => 
                 chain.released === "no" ? (
                   <UnreleasedCard
                     key={chain.id}
@@ -428,7 +379,7 @@ function Nodes() {
                     runningNodes={runningNodes}
                   />
                 )
-              ))}
+              )}
           </div>
         </div>
         <div className="chain-section" style={{ marginBottom: '0' }}>
@@ -436,27 +387,24 @@ function Nodes() {
           <div className="l2-chains" style={{ display: 'flex', flexWrap: 'wrap', gap: '20px', width: '100%', marginBottom: '-10px' }}>
             {chains
               .filter(chain => chain.chain_type === 2)
-              .map(chain => {
-                console.log('Rendering L2 chain:', chain.id, 'Full chain data:', chain);
-                return (
-                  <div key={chain.id} style={{ width: 'calc(50% - 10px)' }}>
-                    {chain.released === "no" ? (
-                      <UnreleasedCard chain={chain} />
-                    ) : (
-                      <Card
-                        chain={chain}
-                        onUpdateChain={handleUpdateChain}
-                        onDownload={handleDownloadChain}
-                        onStart={handleStartChain}
-                        onStop={handleStopChain}
-                        onReset={handleResetChain}
-                        onOpenWalletDir={handleOpenWalletDir}
-                        runningNodes={runningNodes}
-                      />
-                    )}
-                  </div>
-                );
-              })}
+              .map(chain => (
+                <div key={chain.id} style={{ width: 'calc(50% - 10px)' }}>
+                  {chain.released === "no" ? (
+                    <UnreleasedCard chain={chain} />
+                  ) : (
+                    <Card
+                      chain={chain}
+                      onUpdateChain={handleUpdateChain}
+                      onDownload={handleDownloadChain}
+                      onStart={handleStartChain}
+                      onStop={handleStopChain}
+                      onReset={handleResetChain}
+                      onOpenWalletDir={handleOpenWalletDir}
+                      runningNodes={runningNodes}
+                    />
+                  )}
+                </div>
+              ))}
           </div>
         </div>
       </div>

@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
-import { BrowserRouter as Router, Route, Routes } from 'react-router-dom';
+import { HashRouter as Router, Route, Routes } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
+import { setChains } from './store/chainsSlice';
 import './App.css';
 import './scrollbar.css';
 import NavBar from './components/NavBar';
@@ -22,41 +23,57 @@ function AppContent() {
   const { isDarkMode } = useTheme();
   const dispatch = useDispatch();
   const [showWelcomeModal, setShowWelcomeModal] = useState(false);
+  const [isInitialized, setIsInitialized] = useState(false);
 
-  // Make cardData globally available
-  useEffect(() => {
-    window.cardData = cardData;
-  }, []);
-
-  useEffect(() => {
-    document.body.className = isDarkMode ? 'dark' : 'light';
-  }, [isDarkMode]);
-
-  // Check for updates and master wallet on startup
+  // Make cardData globally available and initialize app data
   useEffect(() => {
     const initializeApp = async () => {
-      // Check for master wallet
+      window.cardData = cardData;
+
       try {
-        const result = await window.electronAPI.getMasterWallet();
-        if (!result.success || !result.data) {
+        const walletResult = await window.electronAPI.getMasterWallet();
+        if (!walletResult.success || !walletResult.data) {
           setShowWelcomeModal(true);
         }
-      } catch (error) {
-        console.error('Error checking master wallet:', error);
-        setShowWelcomeModal(true);
-      }
 
+        const config = await window.electronAPI.getConfig();
+        const chainsWithStatus = await Promise.all(
+          config.chains
+            .filter(chain => chain.enabled)
+            .map(async chain => {
+              const dependencyInfo = cardData.find(d => d.id === chain.id);
+              const status = await window.electronAPI.getChainStatus(chain.id);
+              return {
+                ...chain,
+                dependencies: dependencyInfo?.dependencies || [],
+                status,
+                progress: 0,
+                released: chain.released,
+              };
+            })
+        );
+        dispatch(setChains(chainsWithStatus));
+        setIsInitialized(true);
+      } catch (error) {
+        console.error('Error initializing app:', error);
+        setShowWelcomeModal(true);
+        setIsInitialized(true);
+      }
     };
 
     initializeApp();
   }, [dispatch]);
+
+  useEffect(() => {
+    document.body.className = isDarkMode ? 'dark' : 'light';
+  }, [isDarkMode]);
 
   return (
     <Router>
       <div className="App">
         <NavBar />
         <Routes>
-          <Route path="/" element={<Nodes />} />
+          <Route path="/" element={isInitialized ? <Nodes /> : null} />
           {/* <Route path="/tools" element={<Tools />} /> */}
           <Route path="/settings" element={<Settings />} />
           <Route path="/other" element={<Other />} />
