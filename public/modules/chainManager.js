@@ -386,7 +386,27 @@ class ChainManager {
             await Promise.all([
               new Promise(resolve => killBitWindow.on('exit', resolve)),
               new Promise(resolve => killBitWindowd.on('exit', resolve))
+            ]); 
+          } else if (process.platform === 'win32') {
+            // On Windows, kill both processes
+            const killBitWindow = spawn('taskkill', ['/F', '/IM', 'bitwindow.exe']);
+            const killBitWindowd = spawn('taskkill', ['/F', '/IM', 'bitwindowd.exe']);
+            
+            await Promise.all([
+              new Promise(resolve => killBitWindow.on('exit', resolve)),
+              new Promise(resolve => killBitWindowd.on('exit', resolve))
             ]);
+          } else {
+           // On Linux, kill both processes
+            const killBitWindow = spawn('pkill', ['bitwindow']);
+            const killBitWindowd = spawn('pkill', ['bitwindowd']);
+            
+            await Promise.all([
+              new Promise(resolve => killBitWindow.on('exit', resolve)),
+              new Promise(resolve => killBitWindowd.on('exit', resolve))
+            ]);
+          }
+        }
 
             // Let the process checker detect the stop and update status
             await new Promise(resolve => {
