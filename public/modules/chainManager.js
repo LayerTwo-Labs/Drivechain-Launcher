@@ -360,25 +360,33 @@ class ChainManager {
     });
   }
 
-  async stopChain(chainId) {
-    const childProcess = this.runningProcesses[chainId];
-    if (!childProcess) {
-      return { success: false, error: "Process not found" };
-    }
+async stopChain(chainId) {
+  const childProcess = this.runningProcesses[chainId];
+  if (!childProcess) {
+    return { success: false, error: "Process not found" };
+  }
 
-    try {
-      // Special handling for BitWindow
-      if (chainId === 'bitwindow') {
+  try {
+    // Special handling for BitWindow
+    if (chainId === 'bitwindow') {
+      try {
+        // Update UI to show stopping state
+        this.chainStatuses.set(chainId, 'stopping');
+        this.mainWindow.webContents.send("chain-status-update", {
+          chainId,
+          status: "stopping"
+        });
+
+        // Try to stop BitWindow gracefully using the client first
         try {
-          // Update UI to show stopping state
-          this.chainStatuses.set(chainId, 'stopping');
-          this.mainWindow.webContents.send("chain-status-update", {
-            chainId,
-            status: "stopping"
-          });
-
-          // Kill both processes
+          await this.bitWindowClient.stop();
+          console.log("BitWindow stopped gracefully via Connect API");
+        } catch (error) {
+          console.log("Could not stop BitWindow gracefully, falling back to kill:", error);
+          
+          // Kill both processes if graceful shutdown fails
           if (process.platform === 'darwin') {
+            // On macOS, kill both the GUI and daemon processes
             const killBitWindow = spawn('killall', ['bitwindow']);
             const killBitWindowd = spawn('killall', ['bitwindowd']);
             
@@ -386,7 +394,7 @@ class ChainManager {
             await Promise.all([
               new Promise(resolve => killBitWindow.on('exit', resolve)),
               new Promise(resolve => killBitWindowd.on('exit', resolve))
-            ]); 
+            ]);
           } else if (process.platform === 'win32') {
             // On Windows, kill both processes
             const killBitWindow = spawn('taskkill', ['/F', '/IM', 'bitwindow.exe']);
@@ -397,7 +405,7 @@ class ChainManager {
               new Promise(resolve => killBitWindowd.on('exit', resolve))
             ]);
           } else {
-           // On Linux, kill both processes
+            // On Linux, kill both processes
             const killBitWindow = spawn('pkill', ['bitwindow']);
             const killBitWindowd = spawn('pkill', ['bitwindowd']);
             
@@ -408,49 +416,63 @@ class ChainManager {
           }
         }
 
-            // Let the process checker detect the stop and update status
-            await new Promise(resolve => {
-              const maxWaitTime = 5000; // 5 second timeout
-              const startTime = Date.now();
-              
-              const waitInterval = setInterval(() => {
-                const checkProcess = spawn('osascript', ['-e', 'tell application "System Events" to count processes whose name is "bitwindow"']);
-                checkProcess.stdout.on('data', (data) => {
-                  const isRunning = parseInt(data.toString().trim()) > 0;
-                  if (!isRunning || Date.now() - startTime > maxWaitTime) {
-                    clearInterval(waitInterval);
-                    
-                    // Now that we confirmed processes are dead, clean up
-                    const checkInterval = this.processCheckers.get(chainId);
-                    if (checkInterval) {
-                      clearInterval(checkInterval);
-                      this.processCheckers.delete(chainId);
-                    }
-                    
-                    delete this.runningProcesses[chainId];
-                    this.chainStatuses.set(chainId, 'stopped');
-                    this.mainWindow.webContents.send("chain-status-update", {
-                      chainId,
-                      status: "stopped"
-                    });
-                    
-                    resolve();
+        // Let the process checker detect the stop and update status
+        await new Promise(resolve => {
+          const maxWaitTime = 5000; // 5 second timeout
+          const startTime = Date.now();
+          
+          const waitInterval = setInterval(() => {
+            if (process.platform === 'darwin') {
+              const checkProcess = spawn('osascript', ['-e', 'tell application "System Events" to count processes whose name is "bitwindow" or name is "bitwindowd"']);
+              checkProcess.stdout.on('data', (data) => {
+                const isRunning = parseInt(data.toString().trim()) > 0;
+                if (!isRunning || Date.now() - startTime > maxWaitTime) {
+                  clearInterval(waitInterval);
+                  
+                  // Now that we confirmed processes are dead, clean up
+                  const checkInterval = this.processCheckers.get(chainId);
+                  if (checkInterval) {
+                    clearInterval(checkInterval);
+                    this.processCheckers.delete(chainId);
                   }
+                  
+                  delete this.runningProcesses[chainId];
+                  this.chainStatuses.set(chainId, 'stopped');
+                  this.mainWindow.webContents.send("chain-status-update", {
+                    chainId,
+                    status: "stopped"
+                  });
+                  
+                  resolve();
+                }
+              });
+            } else {
+              // For non-macOS platforms, just wait a bit and assume processes are killed
+              if (Date.now() - startTime > 2000 || Date.now() - startTime > maxWaitTime) {
+                clearInterval(waitInterval);
+                
+                delete this.runningProcesses[chainId];
+                this.chainStatuses.set(chainId, 'stopped');
+                this.mainWindow.webContents.send("chain-status-update", {
+                  chainId,
+                  status: "stopped"
                 });
-              }, 100);
-            });
-          } else {
-            childProcess.kill();
-          }
-          return { success: true };
-        } catch (error) {
-          console.error('Failed to stop BitWindow gracefully:', error);
-          // Just in case process is still in our tracking
-          delete this.runningProcesses[chainId];
-          this.chainStatuses.set(chainId, 'stopped');
-          return { success: true };
-        }
+                
+                resolve();
+              }
+            }
+          }, 100);
+        });
+        
+        return { success: true };
+      } catch (error) {
+        console.error('Failed to stop BitWindow gracefully:', error);
+        // Just in case process is still in our tracking
+        delete this.runningProcesses[chainId];
+        this.chainStatuses.set(chainId, 'stopped');
+        return { success: true };
       }
+    }
 
       // For Bitcoin Core, try graceful shutdown first
       if (chainId === 'bitcoin') {
