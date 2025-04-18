@@ -110,12 +110,12 @@
             "directories": {
                 "base": {
                     "linux": ".local/share/bitwindow",
-                    "darwin": "Library/Application Support/com.layertwolabs.bitwindow",
-                    "win32": "AppData/Roaming/com.layertwolabs.bitwindow"
+                    "darwin": "Library/Application Support/bitwindow",
+                    "win32": "AppData/Roaming/bitwindow"
                 },
                 "wallet": ""
             },
-            "extra_delete": ["Library/Application Support/bitwindow", "Library/AppData/Roaming/bitwindow", ".local/share/com.layertwolabs.bitwindow"],
+            "extra_delete": ["Library/Application Support/com.layertwolabs.bitwindow", "Library/AppData/Roaming/com.layertwolabs.bitwindow", "Library/AppData/Roaming/com.example", ".local/share/com.layertwolabs.bitwindow"],
             "extract_dir": {
                 "linux": "Drivechain-Launcher-Downloads/bitwindow",
                 "darwin": "Drivechain-Launcher-Downloads/bitwindow",
