@@ -1,6 +1,7 @@
 const { app } = require("electron");
 const { EventEmitter } = require('events');
-const fs = require("fs-extra");
+const fs = require("fs/promises");
+const { createReadStream, createWriteStream } = require('fs');
 const path = require("path");
 const axios = require("axios");
 const AdmZip = require("adm-zip");
@@ -95,7 +96,11 @@ class DownloadManager extends EventEmitter {
       totalLength: 0,
     });
     this.mainWindow.webContents.send("download-started", { chainId });
+
+    console.log(`[${chainId}] Downloading and extracting`);
     this.downloadAndExtract(chainId, url, basePath);
+
+    console.log(`[${chainId}] Sending downloads update`);
     this.sendDownloadsUpdate();
   }
 
@@ -134,20 +139,24 @@ class DownloadManager extends EventEmitter {
       
       if (isDirectBinary) {
         // For direct binary, just move to final location and make executable
-        await fs.promises.rename(tempPath, finalPath);
-        console.log(`[${chainId}] Downloaded binary to: ${finalPath}`);
+        await fs.rename(tempPath, finalPath);
+        
+        console.log(`[${chainId}] Downloaded direct binary to: ${finalPath}`);
         if (process.platform !== 'win32') {
-          await fs.promises.chmod(finalPath, 0o755);
+          await fs.chmod(finalPath, 0o755);
           console.log(`[${chainId}] Made binary executable`);
         }
       } else {
         // For archives, extract as usual
         if (fileExt === '.tar.gz') {
+          console.log(`[${chainId}] Extracting tar.gz file`);
           await this.extractTarGz(chainId, tempPath, basePath);
         } else {
+          console.log(`[${chainId}] Extracting zip file`);
           await this.extractZip(chainId, tempPath, basePath);
         }
-        await fs.promises.unlink(tempPath);
+        console.log(`[${chainId}] Deleting temp file: ${tempPath}`);
+        await fs.unlink(tempPath);
       }
 
       // Save download timestamp
@@ -174,7 +183,7 @@ class DownloadManager extends EventEmitter {
       this.sendDownloadsUpdate();
 
       try {
-        await fs.promises.unlink(tempPath);
+        await fs.unlink(tempPath);
       } catch (unlinkError) {
         console.error(`Failed to delete partial download for ${chainId}:`, unlinkError);
       }
@@ -184,7 +193,7 @@ class DownloadManager extends EventEmitter {
   async extractTarGz(chainId, tarPath, basePath) {
     try {
       await pipeline(
-        fs.createReadStream(tarPath),
+        createReadStream(tarPath),
         tar.x({
           cwd: basePath,
           strip: 0
@@ -204,7 +213,7 @@ class DownloadManager extends EventEmitter {
       };
       this.activeDownloads.set(chainId, download);
 
-      const writer = fs.createWriteStream(zipPath, { flags: "a" });
+      const writer = createWriteStream(zipPath, { flags: "a" });
       let downloadedLength = download.downloadedLength || 0;
 
       try {

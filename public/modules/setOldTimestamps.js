@@ -1,5 +1,5 @@
 const path = require('path');
-const fs = require('fs-extra');
+const fs = require('fs/promises');
 const os = require('os');
 
 // Get the app data directory based on platform
@@ -30,8 +30,8 @@ async function setOldTimestamps() {
     
     // Write to downloads.json in app data directory
     const downloadsPath = path.join(getAppDataPath(), 'downloads.json');
-    await fs.ensureDir(path.dirname(downloadsPath));
-    await fs.writeJson(downloadsPath, timestamps, { spaces: 2 });
+    await mkdirAll(path.dirname(downloadsPath));
+    await fs.writeFile(downloadsPath, JSON.stringify(timestamps, null, 2));
     
     console.log('All chain timestamps set to 2020-01-01');
     console.log('Timestamps file:', downloadsPath);

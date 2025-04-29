@@ -1,5 +1,5 @@
 const { app } = require('electron');
-const fs = require('fs-extra');
+const fs = require('fs'); // NO promises here, need explicit sync
 const path = require('path');
 
 class DownloadTimestamps {

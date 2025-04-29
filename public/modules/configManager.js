@@ -1,6 +1,7 @@
 const { app } = require("electron");
-const fs = require("fs-extra");
+const fs = require("fs/promises");
 const path = require("path");
+const { mkdirAll } = require("./files");
 
 class ConfigManager {
   constructor(configPath) {
@@ -10,7 +11,7 @@ class ConfigManager {
 
   async loadConfig() {
     try {
-      const configData = await fs.promises.readFile(this.configPath, "utf8");
+      const configData = await fs.readFile(this.configPath, "utf8");
       this.config = JSON.parse(configData);
       return this.config;
     } catch (error) {
@@ -21,20 +22,6 @@ class ConfigManager {
 
   getConfig() {
     return this.config;
-  }
-
-  async createDirectory(dirPath) {
-    try {
-      await fs.promises.access(dirPath, fs.constants.F_OK);
-      return false;
-    } catch (error) {
-      if (error.code === "ENOENT") {
-        await fs.promises.mkdir(dirPath, { recursive: true });
-        return true;
-      } else {
-        throw error;
-      }
-    }
   }
 
   async setupChainDirectories() {
@@ -66,7 +53,7 @@ class ConfigManager {
 
       try {
         const fullPath = path.join(homeDir, baseDir);
-        const created = await this.createDirectory(fullPath);
+        const created = await mkdirAll(fullPath);
         if (created) {
           directoriesCreated++;
           console.log(`Created base directory for ${chain.id}: ${fullPath}`);
@@ -152,7 +139,7 @@ class ConfigManager {
 
       try {
         const fullPath = path.join(downloadsDir, extractDir);
-        const created = await this.createDirectory(fullPath);
+        const created = await mkdirAll(fullPath);
         if (created) {
           directoriesCreated++;
           console.log(`Created extract directory for ${chain.id}: ${fullPath}`);

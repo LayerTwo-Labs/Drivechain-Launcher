@@ -1,6 +1,7 @@
 const { app } = require('electron');
 const path = require('path');
-const fs = require('fs-extra');
+const fs = require('fs/promises');
+const { mkdirAll, fileExists } = require("./files");
 const bip39 = require('bip39');
 const bitcoin = require('bitcoinjs-lib');
 const HDKey = require('hdkey');
@@ -14,8 +15,13 @@ class WalletService extends EventEmitter {
     super();
     this.walletDir = path.join(app.getPath('userData'), 'wallet_starters');
     this.mnemonicsDir = path.join(this.walletDir, 'mnemonics');
-    fs.ensureDirSync(this.walletDir);
-    fs.ensureDirSync(this.mnemonicsDir);
+  }
+  
+  async ensureDirs() {
+    await Promise.all([
+      mkdirAll(this.walletDir),
+      mkdirAll(this.mnemonicsDir)
+    ]);
   }
 
   getMnemonicPath(chainId) {
@@ -168,7 +174,7 @@ class WalletService extends EventEmitter {
       walletData.name = 'Master';
 
       // Save wallet data
-      await fs.writeJson(walletPath, walletData, { spaces: 2 });
+      await fs.writeFile(walletPath, JSON.stringify(walletData, null, 2));
       
       this.emit('wallet-updated');
       return true;
@@ -181,11 +187,11 @@ class WalletService extends EventEmitter {
   async saveL1Starter(walletData) {
     // Save full wallet data
     const l1Path = path.join(this.walletDir, 'l1_starter.json');
-    await fs.writeJson(l1Path, walletData, { spaces: 2 });
+    await fs.writeFile(l1Path, JSON.stringify(walletData, null, 2));
 
     // Save mnemonic only for L1 if it doesn't exist
     const mnemonicPath = path.join(this.mnemonicsDir, 'l1.txt');
-    if (!(await fs.pathExists(mnemonicPath))) {
+    if (!(await fileExists(mnemonicPath))) {
       console.log('Creating new mnemonic file for L1');
       await fs.writeFile(mnemonicPath, walletData.mnemonic);
     } else {
@@ -198,11 +204,11 @@ class WalletService extends EventEmitter {
   async saveSidechainStarter(slot, walletData) {
     // Save full wallet data
     const sidechainPath = path.join(this.walletDir, `sidechain_${slot}_starter.json`);
-    await fs.writeJson(sidechainPath, walletData, { spaces: 2 });
+    await fs.writeFile(sidechainPath, JSON.stringify(walletData, null, 2));
     
     // Save mnemonic only for chain apps if it doesn't exist
     const mnemonicPath = path.join(this.mnemonicsDir, `sidechain_${slot}.txt`);
-    if (!(await fs.pathExists(mnemonicPath))) {
+    if (!(await fileExists(mnemonicPath))) {
       const chainNames = {
         9: 'Thunder',
         2: 'Bitnames',
@@ -228,8 +234,8 @@ class WalletService extends EventEmitter {
     try {
       const walletPath = path.join(this.walletDir, 'master_starter.json');
       
-      if (await fs.pathExists(walletPath)) {
-        const walletData = await fs.readJson(walletPath);
+      if (await fileExists(walletPath)) {
+        const walletData = await fs.readFile(walletPath, 'utf8').then(JSON.parse);
         if (!walletData.mnemonic || !walletData.xprv) {
           throw new Error('Invalid wallet data format');
         }
@@ -245,7 +251,7 @@ class WalletService extends EventEmitter {
   async deleteWallet() {
     try {
       const walletPath = path.join(this.walletDir, 'master_starter.json');
-      await fs.remove(walletPath);
+      await fs.rm(walletPath);
       this.emit('wallet-updated');
       return true;
     } catch (error) {
@@ -381,7 +387,7 @@ class WalletService extends EventEmitter {
 
       // Check and generate L1 starter if needed
       const l1Path = path.join(this.walletDir, 'l1_starter.json');
-      if (!(await fs.pathExists(l1Path))) {
+      if (!(await fileExists(l1Path))) {
         try {
           await this.deriveL1Starter();
           console.log('Generated new L1 starter');
@@ -394,7 +400,7 @@ class WalletService extends EventEmitter {
       const sidechainSlots = [9, 2, 3]; // Thunder, Bitnames, and ZSide respectively
       for (const slot of sidechainSlots) {
         const sidechainPath = path.join(this.walletDir, `sidechain_${slot}_starter.json`);
-        if (!(await fs.pathExists(sidechainPath))) {
+        if (!(await fileExists(sidechainPath))) {
           try {
             await this.deriveSidechainStarter(slot);
           } catch (error) {
