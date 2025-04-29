@@ -5,8 +5,7 @@ class BitWindowClient {
     this.config = {
       baseURL: 'http://127.0.0.1:8080',
       headers: {
-        'Content-Type': 'application/connect+json',
-        'Connect-Protocol-Version': '1'
+        'Content-Type': 'application/json',
       }
     };
     this.connected = false;
@@ -22,7 +21,7 @@ class BitWindowClient {
       );
       return response.data;
     } catch (error) {
-      console.error(`BitWindow Connect call failed (${service}/${method}):`, error.message);
+      console.error(`BitWindow Connect call failed (${this.config.baseURL}/${service}/${method}):`, error.message);
       throw error;
     }
   }

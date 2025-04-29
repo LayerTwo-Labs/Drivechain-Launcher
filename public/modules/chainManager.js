@@ -219,31 +219,23 @@ class ChainManager {
           // Wait for the app to start
           await new Promise((resolve, reject) => {
             childProcess.on('exit', async (code) => {
+              console.log(`[${chainId}] BitWindow exited with code ${code}`);
+
               if (code === 0) {
-                // Check if BitWindow is actually running using AppleScript
-                const checkProcess = spawn('osascript', ['-e', 'tell application "System Events" to count processes whose name is "bitwindow"']);
-                const isRunning = await new Promise((resolve) => {
-                  checkProcess.stdout.on('data', (data) => {
-                    resolve(parseInt(data.toString().trim()) > 0);
-                  });
-                  checkProcess.on('error', () => resolve(false));
-                });
+                const isRunning = await this.bitWindowClient.waitForConnection();
                 
                 if (isRunning) {
+                  console.log(`[${chainId}] BitWindow is running`);
                   // Store process info
                   this.runningProcesses[chainId] = {};
                   
                   // Start process checker
                   const checkInterval = setInterval(async () => {
-                    const checkProcess = spawn('osascript', ['-e', 'tell application "System Events" to count processes whose name is "bitwindow"']);
-                    const stillRunning = await new Promise((resolve) => {
-                      checkProcess.stdout.on('data', (data) => {
-                        resolve(parseInt(data.toString().trim()) > 0);
-                      });
-                      checkProcess.on('error', () => resolve(false));
-                    });
+                    const stillRunning = await this.bitWindowClient.checkConnection();
 
                     if (!stillRunning) {
+                      console.log(`[${chainId}] BitWindow is NOT running`);
+
                       // BitWindow was closed
                       clearInterval(this.processCheckers.get(chainId));
                       this.processCheckers.delete(chainId);
@@ -455,6 +447,7 @@ class ChainManager {
   async stopChain(chainId) {
     const childProcess = this.runningProcesses[chainId];
     if (!childProcess) {
+      console.log(`[${chainId}] Process not found!`);
       return { success: false, error: "Process not found" };
     }
 
@@ -471,13 +464,14 @@ class ChainManager {
 
           // Kill both processes
           if (process.platform === 'darwin') {
+            console.log(`[${chainId}] Killing BitWindow processes`);
             const killBitWindow = spawn('killall', ['bitwindow']);
             const killBitWindowd = spawn('killall', ['bitwindowd']);
             
             // Wait for both kill commands to complete
             await Promise.all([
-              new Promise(resolve => killBitWindow.on('exit', resolve)),
-              new Promise(resolve => killBitWindowd.on('exit', resolve))
+              new Promise(resolve => killBitWindow.on('exit', resolve)).then(() => console.log(`[${chainId}] bitwindow killed`)),
+              new Promise(resolve => killBitWindowd.on('exit', resolve)).then(() => console.log(`[${chainId}] bitwindowd killed`))
             ]);
 
             // Let the process checker detect the stop and update status
@@ -485,10 +479,8 @@ class ChainManager {
               const maxWaitTime = 5000; // 5 second timeout
               const startTime = Date.now();
               
-              const waitInterval = setInterval(() => {
-                const checkProcess = spawn('osascript', ['-e', 'tell application "System Events" to count processes whose name is "bitwindow"']);
-                checkProcess.stdout.on('data', (data) => {
-                  const isRunning = parseInt(data.toString().trim()) > 0;
+              const waitInterval = setInterval(async () => {
+                  const isRunning = await this.bitWindowClient.checkConnection(); 
                   if (!isRunning || Date.now() - startTime > maxWaitTime) {
                     clearInterval(waitInterval);
                     
@@ -508,7 +500,6 @@ class ChainManager {
                     
                     resolve();
                   }
-                });
               }, 100);
             });
           } else {

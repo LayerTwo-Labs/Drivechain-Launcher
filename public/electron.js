@@ -288,6 +288,7 @@ function setupIPCHandlers() {
 
   ipcMain.handle("stop-chain", async (event, chainId) => {
     try {
+      console.log(`[${chainId}] Stopping chain...`);
       return await chainManager.stopChain(chainId);
     } catch (error) {
       console.error("Failed to stop chain:", error);
