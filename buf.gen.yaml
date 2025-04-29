@@ -9,7 +9,7 @@ inputs:
 
 plugins:
   - remote: buf.build/bufbuild/es:v2.2.5
-    out: gen
+    out: public/gen
     # https://github.com/bufbuild/protobuf-es/blob/main/MANUAL.md#plugin-options
     opt:
       - js_import_style=legacy_commonjs
