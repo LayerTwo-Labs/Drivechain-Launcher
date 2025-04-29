@@ -36,8 +36,7 @@
   },
   "scripts": {
     "react-start": "react-scripts start",
-    "copy-gen": "cp -r gen/ build/gen/",
-    "react-build": "react-scripts build && npm run copy-gen",
+    "react-build": "react-scripts build",
     "react-test": "react-scripts test",
     "react-eject": "react-scripts eject",
     "electron-build": "electron-builder",
@@ -78,11 +77,7 @@
     "productName": "Drivechain Launcher",
     "files": [
       "build/**/*",
-      "public/**/*",
-      "gen/**/*",
-      "node_modules/@bufbuild/**/*",
-      "node_modules/@connectrpc/**/*",
-      "node_modules/fs-extra/**/*"
+      "public/**/*"
     ],
     "directories": {
       "buildResources": "public",
