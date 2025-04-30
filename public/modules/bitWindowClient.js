@@ -29,7 +29,7 @@ class BitWindowClient {
   async checkConnection() {
     try {
       // Use BitcoindService for status check
-      await this.makeConnectRequest('bitcoind.v1.BitcoindService', 'GetBlockchainInfo', {});
+      await this.makeConnectRequest('health.v1.HealthService', 'Check', {});
       return true;
     } catch (error) {
       return false;
