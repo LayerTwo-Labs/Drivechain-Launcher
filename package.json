@@ -139,7 +139,6 @@
       "entitlements": "entitlements.mac.plist",
       "entitlementsInherit": "entitlements.mac.plist",
       "extendInfo": {
-        "NSAppleEventsUsageDescription": "Please allow access to script browser applications to detect drivechain nodes.",
         "NSCameraUsageDescription": "Application requests access to the device's camera.",
         "NSMicrophoneUsageDescription": "Application requests access to the device's microphone.",
         "NSDocumentsFolderUsageDescription": "Application requests access to the user's Documents folder.",
