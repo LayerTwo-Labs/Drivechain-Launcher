@@ -8,6 +8,7 @@ const AdmZip = require("adm-zip");
 const tar = require("tar");
 const { pipeline } = require('stream/promises');
 const getDownloadTimestamps = require('./downloadTimestamps');
+const { removePath } = require("./files");
 
 class DownloadManager extends EventEmitter {
   constructor(mainWindow, config) {
@@ -424,7 +425,7 @@ class DownloadManager extends EventEmitter {
 
       for (const tempFile of tempFiles) {
         try {
-          await fs.remove(tempFile);
+          await removePath(tempFile);
         } catch (err) {
           // Ignore errors for individual temp files
           console.log(`Could not remove temp file ${tempFile}:`, err.message);

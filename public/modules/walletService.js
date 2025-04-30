@@ -251,7 +251,7 @@ class WalletService extends EventEmitter {
   async deleteWallet() {
     try {
       const walletPath = path.join(this.walletDir, 'master_starter.json');
-      await fs.rm(walletPath);
+      await removePath(walletPath);
       this.emit('wallet-updated');
       return true;
     } catch (error) {

@@ -14,5 +14,9 @@ async function fileExists(path) {
   }
 }
 
+async function removePath(path) {
+  await fs.rm(path, { recursive: true, force: true });
+}
 
-module.exports = { mkdirAll, fileExists };
+
+module.exports = { mkdirAll, fileExists, removePath };

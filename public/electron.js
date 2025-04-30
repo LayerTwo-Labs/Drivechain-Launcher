@@ -8,7 +8,7 @@ if (process.platform === 'linux') {
 }
 const path = require("path");
 const fs = require("fs/promises");
-const { fileExists, mkdirAll } = require("./modules/files");
+const { fileExists, mkdirAll, removePath } = require("./modules/files");
 const isDev = require("electron-is-dev");
 const axios = require("axios");
 const ConfigManager = require("./modules/configManager");
@@ -566,7 +566,7 @@ function setupIPCHandlers() {
 
         // Delete existing binary directory
         console.log(`[Update Status] Removing old binaries for ${chain.display_name}...`);
-        await fs.remove(extractPath);
+        await removePath(extractPath);
 
         // Get download URL based on chain type
         let url;
@@ -645,7 +645,7 @@ function setupIPCHandlers() {
     try {
       const walletDir = path.join(app.getPath('userData'), 'wallet_starters');
       if (await fileExists(walletDir)) {
-        await fs.remove(walletDir);
+        await removePath(walletDir);
       }
       return { success: true };
     } catch (error) {

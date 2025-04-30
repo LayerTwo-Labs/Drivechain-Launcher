@@ -2,7 +2,7 @@ const { app, shell } = require("electron");
 const fs = require("fs/promises");
 const path = require("path");
 const { spawn } = require("child_process");
-const { mkdirAll, fileExists } = require("./files");
+const { mkdirAll, fileExists , removePath} = require("./files");
 const BitcoinMonitor = require("./bitcoinMonitor");
 const BitWindowClient = require("./bitWindowClient");
 const EnforcerClient = require("./enforcerClient");
@@ -727,7 +727,7 @@ class ChainManager {
           const fullPath = path.join(homeDir, baseDir);
           
           // Remove data directory
-          await fs.remove(fullPath);
+          await removePath(fullPath);
           console.log(`Reset chain ${id}: removed data directory ${fullPath}`);
 
           // Remove extra folders if any
@@ -735,7 +735,7 @@ class ChainManager {
             for (const extraFolder of chain.extra_delete) {
               const extraPath = path.join(homeDir, extraFolder);
               if (await fileExists(extraPath)) {
-                await fs.rm(extraPath, { recursive: true, force: true });
+                await removePath(extraPath);
                 console.log(`Reset chain ${id}: removed extra folder ${extraPath}`);
               }
             }
@@ -746,7 +746,7 @@ class ChainManager {
           if (extractDir) {
             const downloadsDir = app.getPath("downloads");
             const binariesPath = path.join(downloadsDir, extractDir);
-            await fs.remove(binariesPath);
+            await removePath(binariesPath);
             console.log(`Reset chain ${id}: removed binaries directory ${binariesPath}`);
           }
 
@@ -798,7 +798,7 @@ class ChainManager {
 
       const homeDir = app.getPath("home");
       const fullPath = path.join(homeDir, baseDir);
-      await fs.remove(fullPath);
+      await removePath(fullPath);
       console.log(`Reset chain ${chainId}: removed data directory ${fullPath}`);
 
       // Remove extra folders (no OS-specific logic needed)
@@ -806,7 +806,7 @@ class ChainManager {
         for (const extraFolder of chain.extra_delete) {
           const extraPath = path.join(homeDir, extraFolder);
           if (await fileExists(extraPath)) {
-            await fs.rm(extraPath, { recursive: true, force: true });
+            await removePath(extraPath);
             console.log(`Reset chain ${chainId}: removed extra folder ${extraPath}`);
           } else {
             console.log(`Extra folder ${extraPath} does not exist, skipping deletion.`);
@@ -818,7 +818,7 @@ class ChainManager {
       if (extractDir) {
         const downloadsDir = app.getPath("downloads");
         const binariesPath = path.join(downloadsDir, extractDir);
-        await fs.remove(binariesPath);
+        await removePath(binariesPath);
         console.log(`Reset chain ${chainId}: removed binaries directory ${binariesPath}`);
       }
 
@@ -968,7 +968,7 @@ class ChainManager {
         if (baseDir) {
           const homeDir = app.getPath("home");
           const fullPath = path.join(homeDir, baseDir);
-          await fs.rm(fullPath, { recursive: true, force: true });
+          await removePath(fullPath);
           await mkdirAll(fullPath);
           console.log(`Reset chain ${chainId}: removed and recreated data directory ${fullPath}`);
 
@@ -980,7 +980,7 @@ class ChainManager {
         if (extractDir) {
           const downloadsDir = app.getPath("downloads");
           const binariesPath = path.join(downloadsDir, extractDir);
-          await fs.remove(binariesPath);
+          await removePath(binariesPath);
           console.log(`Reset chain ${chainId}: removed binaries directory ${binariesPath}`);
         }
 
