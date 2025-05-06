@@ -185,6 +185,7 @@ export const useChainManagement = () => {
 
     const unsubscribeDownloadComplete = window.electronAPI.onDownloadComplete(
       ({ chainId }) => {
+        console.log(`Received download complete for chain ${chainId}, updating state`);
         setChains(prevChains =>
           prevChains.map(chain =>
             chain.id === chainId

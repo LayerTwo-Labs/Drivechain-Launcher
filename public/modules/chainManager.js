@@ -1,7 +1,8 @@
 const { app, shell } = require("electron");
-const fs = require("fs-extra");
+const fs = require("fs/promises");
 const path = require("path");
 const { spawn } = require("child_process");
+const { mkdirAll, fileExists , removePath} = require("./files");
 const BitcoinMonitor = require("./bitcoinMonitor");
 const BitWindowClient = require("./bitWindowClient");
 const EnforcerClient = require("./enforcerClient");
@@ -24,6 +25,7 @@ class ChainManager {
     this.downloadManager?.on('download-complete', async (chainId) => {
       if (chainId === 'bitcoin') {
         try {
+          console.log('Writing bitcoin.conf after download');
           await this.writeBitcoinConfig();
         } catch (error) {
           console.error('Failed to write bitcoin.conf after download:', error);
@@ -99,12 +101,12 @@ class ChainManager {
       const fullPath = path.join(homeDir, baseDir);
       
       // Ensure the directory exists
-      await fs.ensureDir(fullPath);
+      await mkdirAll(fullPath);
       
       const configPath = path.join(fullPath, 'bitcoin.conf');
       
       // Don't overwrite if config already exists
-      if (await fs.pathExists(configPath)) {
+      if (await fileExists(configPath)) {
         console.log('bitcoin.conf already exists, skipping creation');
         return;
       }
@@ -145,7 +147,7 @@ class ChainManager {
     }
     if (chainId === 'enforcer') {
       const mnemonicsPath = path.join(app.getPath('userData'), 'wallet_starters', 'mnemonics', 'l1.txt');
-      const walletArg = fs.existsSync(mnemonicsPath) 
+      const walletArg = fileExists(mnemonicsPath) 
         ? `--wallet-seed-file=${mnemonicsPath}`
         : '--wallet-auto-create';
 
@@ -208,7 +210,7 @@ class ChainManager {
         if (platform === 'darwin') {
           // On macOS, launch the .app bundle
           const appBundlePath = path.join(downloadsDir, extractDir, 'BitWindow.app');
-          await fs.promises.access(appBundlePath, fs.constants.F_OK);
+          await fileExists(appBundlePath);
           console.log(`Starting BitWindow app bundle at: ${appBundlePath}`);
           
           // Launch using 'open' command for snappy startup
@@ -219,31 +221,23 @@ class ChainManager {
           // Wait for the app to start
           await new Promise((resolve, reject) => {
             childProcess.on('exit', async (code) => {
+              console.log(`[${chainId}] BitWindow exited with code ${code}`);
+
               if (code === 0) {
-                // Check if BitWindow is actually running using AppleScript
-                const checkProcess = spawn('osascript', ['-e', 'tell application "System Events" to count processes whose name is "bitwindow"']);
-                const isRunning = await new Promise((resolve) => {
-                  checkProcess.stdout.on('data', (data) => {
-                    resolve(parseInt(data.toString().trim()) > 0);
-                  });
-                  checkProcess.on('error', () => resolve(false));
-                });
+                const isRunning = await this.bitWindowClient.waitForConnection();
                 
                 if (isRunning) {
+                  console.log(`[${chainId}] BitWindow is running`);
                   // Store process info
                   this.runningProcesses[chainId] = {};
                   
                   // Start process checker
                   const checkInterval = setInterval(async () => {
-                    const checkProcess = spawn('osascript', ['-e', 'tell application "System Events" to count processes whose name is "bitwindow"']);
-                    const stillRunning = await new Promise((resolve) => {
-                      checkProcess.stdout.on('data', (data) => {
-                        resolve(parseInt(data.toString().trim()) > 0);
-                      });
-                      checkProcess.on('error', () => resolve(false));
-                    });
+                    const stillRunning = await this.bitWindowClient.checkConnection();
 
                     if (!stillRunning) {
+                      console.log(`[${chainId}] BitWindow is NOT running`);
+
                       // BitWindow was closed
                       clearInterval(this.processCheckers.get(chainId));
                       this.processCheckers.delete(chainId);
@@ -269,10 +263,10 @@ class ChainManager {
         } else {
           // For other platforms, launch binary directly
           const fullBinaryPath = await this.getBinaryPathForChain(chainId);
-          await fs.promises.access(fullBinaryPath, fs.constants.F_OK);
+          await fileExists(fullBinaryPath);
           
           if (process.platform !== "win32") {
-            await fs.promises.chmod(fullBinaryPath, "755");
+            await fs.chmod(fullBinaryPath, "755");
           }
           
           const childProcess = spawn(fullBinaryPath, [], { 
@@ -301,10 +295,10 @@ class ChainManager {
     // Standard handling for other chains
     try {
       const fullBinaryPath = await this.getBinaryPathForChain(chainId);
-      await fs.promises.access(fullBinaryPath, fs.constants.F_OK);
+      await fs.access(fullBinaryPath, fs.constants.F_OK);
 
       if (process.platform !== "win32") {
-        await fs.promises.chmod(fullBinaryPath, "755");
+        await fs.chmod(fullBinaryPath, "755");
       }
 
       const baseArgs = this.getChainArgs(chainId);
@@ -455,6 +449,7 @@ class ChainManager {
   async stopChain(chainId) {
     const childProcess = this.runningProcesses[chainId];
     if (!childProcess) {
+      console.log(`[${chainId}] Process not found!`);
       return { success: false, error: "Process not found" };
     }
 
@@ -471,13 +466,14 @@ class ChainManager {
 
           // Kill both processes
           if (process.platform === 'darwin') {
+            console.log(`[${chainId}] Killing BitWindow processes`);
             const killBitWindow = spawn('killall', ['bitwindow']);
             const killBitWindowd = spawn('killall', ['bitwindowd']);
             
             // Wait for both kill commands to complete
             await Promise.all([
-              new Promise(resolve => killBitWindow.on('exit', resolve)),
-              new Promise(resolve => killBitWindowd.on('exit', resolve))
+              new Promise(resolve => killBitWindow.on('exit', resolve)).then(() => console.log(`[${chainId}] bitwindow killed`)),
+              new Promise(resolve => killBitWindowd.on('exit', resolve)).then(() => console.log(`[${chainId}] bitwindowd killed`))
             ]);
 
             // Let the process checker detect the stop and update status
@@ -485,10 +481,8 @@ class ChainManager {
               const maxWaitTime = 5000; // 5 second timeout
               const startTime = Date.now();
               
-              const waitInterval = setInterval(() => {
-                const checkProcess = spawn('osascript', ['-e', 'tell application "System Events" to count processes whose name is "bitwindow"']);
-                checkProcess.stdout.on('data', (data) => {
-                  const isRunning = parseInt(data.toString().trim()) > 0;
+              const waitInterval = setInterval(async () => {
+                  const isRunning = await this.bitWindowClient.checkConnection(); 
                   if (!isRunning || Date.now() - startTime > maxWaitTime) {
                     clearInterval(waitInterval);
                     
@@ -508,7 +502,6 @@ class ChainManager {
                     
                     resolve();
                   }
-                });
               }, 100);
             });
           } else {
@@ -594,7 +587,7 @@ class ChainManager {
         
         try {
           if (process.platform !== "win32") {
-            await fs.promises.chmod(bitcoinCliPath, "755");
+            await fs.chmod(bitcoinCliPath, "755");
           }
 
           console.log('Attempting graceful shutdown with:', bitcoinCliPath);
@@ -654,13 +647,16 @@ class ChainManager {
     const extractDir = chain.extract_dir?.[platform];
     if (!extractDir) throw new Error(`No extract directory configured for platform ${platform}`);
 
+
     const downloadsDir = app.getPath("downloads");
+
+    console.log(`[${chainId}] getChainStatus: checking extractDir ${extractDir} and downloadsDir ${downloadsDir}`);
 
     // Special handling for BitWindow on macOS
     if (chainId === 'bitwindow' && platform === 'darwin') {
       const appBundlePath = path.join(downloadsDir, extractDir, 'BitWindow.app');
       try {
-        await fs.promises.access(appBundlePath);
+        await fs.access(appBundlePath);
         if (this.runningProcesses[chainId]) {
           return this.chainStatuses.get(chainId) || "running";
         }
@@ -673,7 +669,7 @@ class ChainManager {
     // Standard handling for other chains
     try {
       const fullBinaryPath = await this.getBinaryPathForChain(chainId);
-      await fs.promises.access(fullBinaryPath);
+      await fs.access(fullBinaryPath);
       if (this.runningProcesses[chainId]) {
         return this.chainStatuses.get(chainId) || "running";
       }
@@ -733,15 +729,15 @@ class ChainManager {
           const fullPath = path.join(homeDir, baseDir);
           
           // Remove data directory
-          await fs.remove(fullPath);
+          await removePath(fullPath);
           console.log(`Reset chain ${id}: removed data directory ${fullPath}`);
 
           // Remove extra folders if any
           if (chain.extra_delete && Array.isArray(chain.extra_delete)) {
             for (const extraFolder of chain.extra_delete) {
               const extraPath = path.join(homeDir, extraFolder);
-              if (await fs.pathExists(extraPath)) {
-                await fs.remove(extraPath);
+              if (await fileExists(extraPath)) {
+                await removePath(extraPath);
                 console.log(`Reset chain ${id}: removed extra folder ${extraPath}`);
               }
             }
@@ -752,12 +748,12 @@ class ChainManager {
           if (extractDir) {
             const downloadsDir = app.getPath("downloads");
             const binariesPath = path.join(downloadsDir, extractDir);
-            await fs.remove(binariesPath);
+            await removePath(binariesPath);
             console.log(`Reset chain ${id}: removed binaries directory ${binariesPath}`);
           }
 
           // Recreate empty data directory
-          await fs.ensureDir(fullPath);
+          await mkdirAll(fullPath);
           console.log(`Recreated empty data directory for chain ${id}: ${fullPath}`);
 
           // Set to not_downloaded
@@ -804,15 +800,15 @@ class ChainManager {
 
       const homeDir = app.getPath("home");
       const fullPath = path.join(homeDir, baseDir);
-      await fs.remove(fullPath);
+      await removePath(fullPath);
       console.log(`Reset chain ${chainId}: removed data directory ${fullPath}`);
 
       // Remove extra folders (no OS-specific logic needed)
       if (chain.extra_delete && Array.isArray(chain.extra_delete)) {
         for (const extraFolder of chain.extra_delete) {
           const extraPath = path.join(homeDir, extraFolder);
-          if (await fs.pathExists(extraPath)) {
-            await fs.remove(extraPath);
+          if (await fileExists(extraPath)) {
+            await removePath(extraPath);
             console.log(`Reset chain ${chainId}: removed extra folder ${extraPath}`);
           } else {
             console.log(`Extra folder ${extraPath} does not exist, skipping deletion.`);
@@ -824,11 +820,11 @@ class ChainManager {
       if (extractDir) {
         const downloadsDir = app.getPath("downloads");
         const binariesPath = path.join(downloadsDir, extractDir);
-        await fs.remove(binariesPath);
+        await removePath(binariesPath);
         console.log(`Reset chain ${chainId}: removed binaries directory ${binariesPath}`);
       }
 
-      await fs.ensureDir(fullPath);
+      await ensureDir(fullPath);
       console.log(`Recreated empty data directory for chain ${chainId}: ${fullPath}`);
 
       await new Promise(resolve => setTimeout(resolve, 100));
@@ -974,8 +970,8 @@ class ChainManager {
         if (baseDir) {
           const homeDir = app.getPath("home");
           const fullPath = path.join(homeDir, baseDir);
-          await fs.remove(fullPath);
-          await fs.ensureDir(fullPath);
+          await removePath(fullPath);
+          await mkdirAll(fullPath);
           console.log(`Reset chain ${chainId}: removed and recreated data directory ${fullPath}`);
 
         }
@@ -986,7 +982,7 @@ class ChainManager {
         if (extractDir) {
           const downloadsDir = app.getPath("downloads");
           const binariesPath = path.join(downloadsDir, extractDir);
-          await fs.remove(binariesPath);
+          await removePath(binariesPath);
           console.log(`Reset chain ${chainId}: removed binaries directory ${binariesPath}`);
         }
 

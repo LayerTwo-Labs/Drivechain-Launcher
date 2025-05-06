@@ -7,7 +7,8 @@ if (process.platform === 'linux') {
   process.env.ELECTRON_DISABLE_SANDBOX = '1';
 }
 const path = require("path");
-const fs = require("fs-extra");
+const fs = require("fs/promises");
+const { fileExists, mkdirAll, removePath } = require("./modules/files");
 const isDev = require("electron-is-dev");
 const axios = require("axios");
 const ConfigManager = require("./modules/configManager");
@@ -157,13 +158,13 @@ function setupIPCHandlers() {
   ipcMain.on('toMain', (event, data) => {
     switch (data.type) {
       case 'update-status':
-        console.log(data.message);
+        console.log("update-status:", data.message);
         break;
       case 'update-progress':
-        console.log(data.message);
+        console.log("update-progress:", data.message);
         break;
       case 'update-error':
-        console.error(data.message);
+        console.error("update-error:", data.message);
         break;
     }
   });
@@ -266,7 +267,7 @@ function setupIPCHandlers() {
           "wallet.mdb"
         );
         
-        const walletExists = await fs.pathExists(walletPath);
+        const walletExists = await fileExists(walletPath);
         console.log(`[${chainId}] Checking wallet.mdb at: ${walletPath}`);
         
         if (!walletExists) {
@@ -287,6 +288,7 @@ function setupIPCHandlers() {
 
   ipcMain.handle("stop-chain", async (event, chainId) => {
     try {
+      console.log(`[${chainId}] Stopping chain...`);
       return await chainManager.stopChain(chainId);
     } catch (error) {
       console.error("Failed to stop chain:", error);
@@ -340,6 +342,8 @@ function setupIPCHandlers() {
   // Download handlers
   ipcMain.handle("download-chain", async (event, chainId) => {
     const chain = config.chains.find((c) => c.id === chainId);
+    console.log(`[${chainId}] received 'download-chain' event`);
+
     if (!chain) throw new Error("Chain not found");
 
     const platform = process.platform;
@@ -370,7 +374,7 @@ function setupIPCHandlers() {
       if (!url) throw new Error(`No download URL found for platform ${platform}`);
     }
 
-    await fs.ensureDir(extractPath);
+    await mkdirAll(extractPath);
     activeDownloadCount++;
     updatePowerSaveBlocker();
     
@@ -479,7 +483,7 @@ function setupIPCHandlers() {
           throw new Error('Invalid wallet type');
       }
 
-      if (await fs.pathExists(filePath)) {
+      if (await fileExists(filePath)) {
         const data = await fs.readJson(filePath);
         return { success: true, data: data.mnemonic };
       }
@@ -562,7 +566,7 @@ function setupIPCHandlers() {
 
         // Delete existing binary directory
         console.log(`[Update Status] Removing old binaries for ${chain.display_name}...`);
-        await fs.remove(extractPath);
+        await removePath(extractPath);
 
         // Get download URL based on chain type
         let url;
@@ -588,7 +592,7 @@ function setupIPCHandlers() {
           if (!url) continue;
         }
 
-        await fs.ensureDir(extractPath);
+        await mkdirAll(extractPath);
         downloadManager.startDownload(chainId, url, extractPath);
       }
 
@@ -627,7 +631,7 @@ function setupIPCHandlers() {
   ipcMain.handle("open-wallet-starters-dir", async () => {
     try {
       const walletDir = path.join(app.getPath('userData'), 'wallet_starters');
-      await fs.ensureDir(walletDir); // Create if doesn't exist
+      await mkdirAll(walletDir); // Create if doesn't exist
       await shell.openPath(walletDir);
       return { success: true };
     } catch (error) {
@@ -640,8 +644,8 @@ function setupIPCHandlers() {
   ipcMain.handle("delete-wallet-starters-dir", async () => {
     try {
       const walletDir = path.join(app.getPath('userData'), 'wallet_starters');
-      if (await fs.pathExists(walletDir)) {
-        await fs.remove(walletDir);
+      if (await fileExists(walletDir)) {
+        await removePath(walletDir);
       }
       return { success: true };
     } catch (error) {
@@ -654,8 +658,8 @@ function setupIPCHandlers() {
     try {
       const walletDir = path.join(app.getPath('userData'), 'wallet_starters');
       const mnemonicsDir = path.join(walletDir, 'mnemonics');
-      await fs.ensureDir(walletDir);
-      await fs.ensureDir(mnemonicsDir);
+      await mkdirAll(walletDir);
+      await mkdirAll(mnemonicsDir);
       return { success: true };
     } catch (error) {
       console.error('Failed to initialize wallet directories:', error);

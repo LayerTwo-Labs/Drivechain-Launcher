@@ -1,8 +1,8 @@
 const { app } = require("electron");
 const path = require("path");
-const fs = require("fs-extra");
-const { promises: fsPromises } = fs;
+const fs = require("fs/promises");
 const shell = require("electron").shell;
+const { mkdirAll } = require("./files");
 
 class DirectoryManager {
   constructor(config) {
@@ -11,7 +11,7 @@ class DirectoryManager {
 
   async analyzeWalletPath(fullPath) {
     try {
-      const stats = await fs.promises.stat(fullPath);
+      const stats = await fs.stat(fullPath);
       return {
         exists: true,
         isDirectory: stats.isDirectory(),
@@ -81,20 +81,6 @@ class DirectoryManager {
     }
   }
 
-  async createDirectory(dirPath) {
-    try {
-      await fsPromises.access(dirPath, fs.constants.F_OK);
-      return false;
-    } catch (error) {
-      if (error.code === "ENOENT") {
-        await fsPromises.mkdir(dirPath, { recursive: true });
-        return true;
-      } else {
-        throw error;
-      }
-    }
-  }
-
   async setupChainDirectories() {
     console.log("Checking chain base directories...");
     const platform = process.platform;
@@ -105,7 +91,7 @@ class DirectoryManager {
       const baseDir = chain.directories.base[platform];
       if (baseDir && typeof baseDir === "string") {
         const fullBasePath = path.join(homeDir, baseDir);
-        const created = await this.createDirectory(fullBasePath);
+        const created = await mkdirAll(fullBasePath);
         if (created) {
           directoriesCreated++;
           console.log(`Created base directory for ${chain.id}: ${fullBasePath}`);

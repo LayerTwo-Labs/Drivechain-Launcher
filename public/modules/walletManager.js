@@ -1,5 +1,5 @@
 const { app, shell } = require("electron");
-const fs = require("fs-extra");
+const fs = require("fs/promises");
 const path = require("path");
 const WalletService = require("./walletService");
 const { EventEmitter } = require('events');
@@ -19,6 +19,8 @@ class WalletManager extends EventEmitter {
   // HD Wallet Management Methods
   async createMasterWallet(options = {}) {
     try {
+      await this.walletService.ensureDirs();
+
       // Generate and save master wallet
       const wallet = await this.walletService.generateWallet(options);
       const success = await this.walletService.saveWallet(wallet);
@@ -101,8 +103,8 @@ class WalletManager extends EventEmitter {
         ? path.join(walletDir, 'l1_starter.json')
         : path.join(walletDir, `sidechain_${chainId}_starter.json`);
 
-      if (await fs.pathExists(walletPath)) {
-        return await fs.readJson(walletPath);
+      if (await fileExists(walletPath)) {
+        return await fs.readFile(walletPath, 'utf8').then(JSON.parse);
       }
       return null;
     } catch (error) {
@@ -132,7 +134,7 @@ class WalletManager extends EventEmitter {
 
   async analyzeWalletPath(fullPath) {
     try {
-      const stats = await fs.promises.stat(fullPath);
+      const stats = await fs.stat(fullPath);
       return {
         exists: true,
         isDirectory: stats.isDirectory(),
