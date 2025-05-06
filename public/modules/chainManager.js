@@ -469,16 +469,10 @@ class ChainManager {
             status: "stopping"
           });
 
-          // Kill both processes
           if (process.platform === 'darwin') {
-            const killBitWindow = spawn('killall', ['bitwindow']);
-            const killBitWindowd = spawn('killall', ['bitwindowd']);
-            
-            // Wait for both kill commands to complete
-            await Promise.all([
-              new Promise(resolve => killBitWindow.on('exit', resolve)),
-              new Promise(resolve => killBitWindowd.on('exit', resolve))
-            ]);
+            const killBitWindow = spawn('killall', ['BitWindow']);
+
+            await killBitWindow.on('exit', () => console.log(`BitWindow killed`));
 
             // Let the process checker detect the stop and update status
             await new Promise(resolve => {
