@@ -117,13 +117,16 @@
             },
             "extra_delete": [
                 "Library/AppData/Roaming/com.layertwolabs.bitwindow",
+                "Library/AppData/Roaming/drivechain-launcher",
                 "Library/AppData/Roaming/com.example",
                 ".local/share/com.layertwolabs.bitwindow",
+                ".config/drivchain-launcher",
                 "Library/Application Support/com.layertwolabs.bitwindow",
                 "Library/Application Support/com.layertwolabs.launcher",
                 "Library/Application Support/bitwindowd",
                 "Library/Application Support/cusf_launcher",
                 "Library/Application Support/com.layertwolabs.zsail",
+                "Library/Application Support/drivechain-launcher",
                 "Library/Application Support/drivechain_launcher",
                 "Library/Application Support/drivechain_launcher_sidechains",
                 "Library/Application Support/ZcashDrivechain"
