@@ -116,8 +116,8 @@
                 "wallet": ""
             },
             "extra_delete": [
-                "Library/AppData/Roaming/com.layertwolabs.bitwindow",
-                "Library/AppData/Roaming/com.example",
+                "AppData/Roaming/com.layertwolabs.bitwindow",
+                "AppData/Roaming/com.example",
                 ".local/share/com.layertwolabs.bitwindow",
                 "Library/Application Support/com.layertwolabs.bitwindow",
                 "Library/Application Support/com.layertwolabs.launcher",
