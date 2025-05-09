@@ -116,9 +116,9 @@
                 "wallet": ""
             },
             "extra_delete": [
-                "Library/AppData/Roaming/com.layertwolabs.bitwindow",
-                "Library/AppData/Roaming/drivechain-launcher",
-                "Library/AppData/Roaming/com.example",
+                "AppData/Roaming/com.layertwolabs.bitwindow",
+                "AppData/Roaming/drivechain-launcher",
+                "AppData/Roaming/com.example",
                 ".local/share/com.layertwolabs.bitwindow",
                 ".config/drivechain-launcher",
                 "Library/Application Support/com.layertwolabs.bitwindow",
