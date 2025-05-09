@@ -739,9 +739,9 @@ class ChainManager {
         
         await new Promise(resolve => setTimeout(resolve, 500));
 
-        const cleanupResult = await this.cleanupBitWindowData();
+        const cleanupResult = await this.cleanupLauncherData();
         if (!cleanupResult) {
-            console.error('Failed to cleanup BitWindow data');
+            console.error('Failed to cleanup Launcher data');
         }
         // Reset each chain's data
         for (const id of chainsToReset) {
