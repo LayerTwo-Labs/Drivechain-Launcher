@@ -32,6 +32,25 @@ class ChainManager {
     });
   }
 
+    async cleanupLauncherData() {
+    try {
+
+      // Delete drivechain-launcher folder
+      const launcherPath = app.getPath('userData');
+      try {
+        await fs.remove(launcherPath);
+        console.log(`Removed drivechain-launcher directory: ${launcherPath}`);
+      } catch (error) {
+        console.log('Skipping folder deletion due to file in use');
+      }
+      
+      return true;
+    } catch (error) {
+      console.error('Failed to cleanup BitWindow data:', error);
+      return false;
+    }
+  }
+
   async isChainReady(chainId) {
     const status = this.chainStatuses.get(chainId);
     if (status !== 'running') return false;
@@ -720,6 +739,10 @@ class ChainManager {
         
         await new Promise(resolve => setTimeout(resolve, 500));
 
+        const cleanupResult = await this.cleanupBitWindowData();
+        if (!cleanupResult) {
+            console.error('Failed to cleanup BitWindow data');
+        }
         // Reset each chain's data
         for (const id of chainsToReset) {
           const chain = this.getChainConfig(id);
