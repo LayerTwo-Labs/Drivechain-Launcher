@@ -3,12 +3,26 @@ import { Clipboard } from 'lucide-react';
 import styles from './FastWithdrawalModal.module.css';
 import WithdrawalSuccessPopup from './WithdrawalSuccessPopup';
 import ErrorPopup from './ErrorPopup';
-import { defaultFastWithdrawalServer, FAST_WITHDRAWAL_SERVERS } from '../utils/fastWithdrawals';
+
+// Note: this is duplicated in the fast withdrawal manager. Dunno how to 
+// share code across /src and /public without breaking things. 
+const FAST_WITHDRAWAL_SERVERS = [
+  {
+    name: 'fw1.drivechain.info (L2L #1)',
+    url: 'https://fw1.drivechain.info',
+  },
+  {
+    name: 'fw2.drivechain.info (L2L #2)',
+    url: 'https://fw2.drivechain.info',
+  },
+];
+
+const defaultFastWithdrawalServer = FAST_WITHDRAWAL_SERVERS[0].url;
 
 const FastWithdrawalModal = () => {
   const [amount, setAmount] = useState('');
   const [address, setAddress] = useState('');
-  const [selectedServer, setSelectedServer] = useState(defaultFastWithdrawalServer());
+  const [selectedServer, setSelectedServer] = useState(defaultFastWithdrawalServer);
   const [layer2Chain, setLayer2Chain] = useState('Thunder');
   const [withdrawalHash, setWithdrawalHash] = useState(null);
   const [paymentTxid, setPaymentTxid] = useState('');
@@ -21,7 +35,7 @@ const FastWithdrawalModal = () => {
   const resetState = () => {
     setAmount('');
     setAddress('');
-    setSelectedServer(defaultFastWithdrawalServer());
+    setSelectedServer(defaultFastWithdrawalServer);
     setLayer2Chain('Thunder');
     setWithdrawalHash(null);
     setPaymentTxid('');
