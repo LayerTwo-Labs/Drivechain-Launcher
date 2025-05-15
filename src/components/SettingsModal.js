@@ -126,8 +126,7 @@ const SettingsModal = ({ onResetComplete }) => {
       // Delete wallet starters directory first
       await window.electronAPI.invoke('delete-wallet-starters-dir');
       
-      // Recreate wallet starters directories
-      await window.electronAPI.invoke('init-wallet-dirs');
+
 
       // Then handle chain resets
       const chains = await window.electronAPI.getConfig();
@@ -143,6 +142,8 @@ const SettingsModal = ({ onResetComplete }) => {
         }
       }
       setShowResetModal(false);
+      // Recreate wallet starters directories
+      await window.electronAPI.invoke('init-wallet-dirs');
       handleClose(); // Close the settings modal after reset
       onResetComplete(); // Show the welcome modal
     } catch (error) {
