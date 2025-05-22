@@ -19,30 +19,7 @@ function spawnWithHighLimits(command, args, options = {}) {
     return spawn(command, args, options);
   }
   
-  // On macOS, if we can't use the native module and current limit is too low, 
-  // we have to fall back to a shell-based approach
-  if (process.platform === 'darwin' && 
-      !fdLimitManager.initialized && 
-      currentFdLimit > 0 && 
-      currentFdLimit < 10000) {
-    console.log('Using shell wrapper for file descriptor limits');
-    
-    // If we're going to use shell, make sure options has the right structure
-    const finalOptions = { 
-      ...options,
-      shell: true,
-      env: { ...process.env, ...(options.env || {}) }
-    };
-    
-    // Escape command and args for shell
-    const escapedCommand = command.replace(/"/g, '\\"');
-    const escapedArgs = args.map(arg => `"${arg.replace(/"/g, '\\"')}"`).join(' ');
-    
-    // Use bash -c to set ulimit then run the command
-    return spawn('bash', ['-c', `ulimit -n 65536 && "${escapedCommand}" ${escapedArgs}`], finalOptions);
-  }
-  
-  // For all other cases, spawn normally
+  // For all platforms, just use normal spawn - fd limits are handled globally in app initialization
   return spawn(command, args, options);
 }
 

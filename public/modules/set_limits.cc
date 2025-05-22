@@ -13,13 +13,24 @@ Napi::Value SetFileDescriptorLimit(const Napi::CallbackInfo& info) {
   // Get the limit from JavaScript
   int limit = info[0].As<Napi::Number>().Int32Value();
   
-  // Set up the rlimit struct
-  struct rlimit rlim;
-  rlim.rlim_cur = limit;
-  rlim.rlim_max = limit;
+  // Get current limits
+  struct rlimit current_rlim;
+  if (getrlimit(RLIMIT_NOFILE, &current_rlim) != 0) {
+    return Napi::Number::New(env, -1); // Error
+  }
+  
+  // Don't set limit higher than the hard limit
+  if (limit > current_rlim.rlim_max) {
+    limit = current_rlim.rlim_max;
+  }
+  
+  // Set up new rlimit - only change soft limit
+  struct rlimit new_rlim;
+  new_rlim.rlim_cur = limit;
+  new_rlim.rlim_max = current_rlim.rlim_max; // Keep existing hard limit
   
   // Make the syscall
-  int result = setrlimit(RLIMIT_NOFILE, &rlim);
+  int result = setrlimit(RLIMIT_NOFILE, &new_rlim);
   
   // Return the result to JavaScript (0 means success)
   return Napi::Number::New(env, result);

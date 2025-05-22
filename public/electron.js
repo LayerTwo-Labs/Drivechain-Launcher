@@ -26,14 +26,28 @@ function increaseFileDescriptorLimits() {
     // Lazy-load the fdLimitManager to avoid circular dependencies
     const fdLimitManager = require('./modules/fdLimitManager');
     
-    // Try to set the limit to 65536
-    const success = fdLimitManager.setFdLimit(65536);
-    
-    if (success) {
-      console.log(`Successfully increased file descriptor limit to 65536`);
-    } else if (process.platform === 'darwin') {
-      console.log(`Could not increase file descriptor limit using native module.`);
-      console.log(`Child processes will use per-process limits via spawnWithHighLimits.`);
+    // For macOS, use the native module
+    if (process.platform === 'darwin') {
+      // Try to set the soft limit to 1000 without changing hard limit
+      const success = fdLimitManager.setFdLimit(1000);
+      
+      if (success) {
+        console.log(`Successfully increased file descriptor soft limit to 1000`);
+      } else {
+        console.log(`Could not increase file descriptor limit using native module.`);
+        console.log(`Child processes will use per-process limits via spawnWithHighLimits.`);
+      }
+    } 
+    // For Linux, use prlimit to just set the soft limit
+    else if (process.platform === 'linux') {
+      try {
+        const { execSync } = require('child_process');
+        // Set only the soft limit, keep hard limit as-is with empty value
+        execSync(`prlimit --pid ${process.pid} --nofile=1000:`);
+        console.log(`Successfully increased file descriptor soft limit to 1000`);
+      } catch (error) {
+        console.error('Failed to set file descriptor limit on Linux:', error);
+      }
     }
   } catch (error) {
     // Silent error handling to avoid startup issues

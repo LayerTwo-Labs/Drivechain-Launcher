@@ -1,7 +1,6 @@
 const { execSync } = require('child_process');
 const fs = require('fs-extra');
 const path = require('path');
-const { app } = require('electron');
 
 class FdLimitManager {
   constructor() {
@@ -34,30 +33,18 @@ class FdLimitManager {
    * @returns {boolean} - Whether the operation was successful
    */
   setFdLimit(limit) {
-    if (process.platform === 'darwin') {
-      if (this.initialized && this.nativeModule) {
-        try {
-          const result = this.nativeModule.setFileDescriptorLimit(limit);
-          return result === 0; // 0 means success in syscalls
-        } catch (error) {
-          console.error('Failed to set file descriptor limit:', error);
-          return false;
-        }
-      }
-      return false;
-    } 
-    else if (process.platform === 'linux') {
+    // This only works on macOS with the native module
+    if (process.platform === 'darwin' && this.initialized && this.nativeModule) {
       try {
-        execSync(`prlimit --pid ${process.pid} --nofile=${limit}:${limit}`);
-        return true;
+        const result = this.nativeModule.setFileDescriptorLimit(limit);
+        return result === 0; // 0 means success in syscalls
       } catch (error) {
-        console.error('Failed to set file descriptor limit on Linux:', error);
+        console.error('Failed to set file descriptor limit:', error);
         return false;
       }
     }
     
-    // On Windows, no special handling needed
-    return true;
+    return false;
   }
   
   /**
@@ -65,14 +52,26 @@ class FdLimitManager {
    * @returns {number} - The current limit or -1 if unknown
    */
   getCurrentLimit() {
-    if (process.platform === 'darwin' || process.platform === 'linux') {
-      try {
-        const output = execSync('ulimit -n').toString().trim();
-        return parseInt(output, 10) || -1;
-      } catch (error) {
-        console.error('Failed to get current file descriptor limit:', error);
+    try {
+      if (process.platform === 'darwin') {
+        // On macOS, get process-specific limit if possible
+        if (this.initialized && this.nativeModule) {
+          // If we have the native module, assume the limit was set by it
+          // In the future, we could add a getrlimit call to the native module
+          return 1000; 
+        }
+        // Fallback - this isn't ideal but better than nothing
+        return -1;
+      } else if (process.platform === 'linux') {
+        // On Linux, use prlimit to get the process-specific limit
+        const output = execSync(`prlimit --pid ${process.pid} --nofile --raw --noheadings`).toString().trim();
+        const [soft] = output.split(/\s+/).map(Number);
+        return soft || -1;
       }
+    } catch (error) {
+      console.error('Failed to get current file descriptor limit:', error);
     }
+    
     return -1;
   }
 }
