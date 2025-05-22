@@ -1,10 +1,50 @@
 const { app, shell } = require("electron");
 const fs = require("fs-extra");
 const path = require("path");
-const { spawn } = require("child_process");
+const { spawn, execSync } = require("child_process");
 const BitcoinMonitor = require("./bitcoinMonitor");
 const BitWindowClient = require("./bitWindowClient");
 const EnforcerClient = require("./enforcerClient");
+const os = require('os');
+const fdLimitManager = require('./fdLimitManager');
+
+// Get current file descriptor limit
+const currentFdLimit = fdLimitManager.getCurrentLimit();
+console.log(`Current file descriptor limit: ${currentFdLimit}`);
+
+// Wrapper for spawn that handles file descriptor limits
+function spawnWithHighLimits(command, args, options = {}) {
+  // Handle utility commands directly without modification
+  if (command.includes('open') || command.includes('killall') || command.includes('taskkill')) {
+    return spawn(command, args, options);
+  }
+  
+  // On macOS, if we can't use the native module and current limit is too low, 
+  // we have to fall back to a shell-based approach
+  if (process.platform === 'darwin' && 
+      !fdLimitManager.initialized && 
+      currentFdLimit > 0 && 
+      currentFdLimit < 10000) {
+    console.log('Using shell wrapper for file descriptor limits');
+    
+    // If we're going to use shell, make sure options has the right structure
+    const finalOptions = { 
+      ...options,
+      shell: true,
+      env: { ...process.env, ...(options.env || {}) }
+    };
+    
+    // Escape command and args for shell
+    const escapedCommand = command.replace(/"/g, '\\"');
+    const escapedArgs = args.map(arg => `"${arg.replace(/"/g, '\\"')}"`).join(' ');
+    
+    // Use bash -c to set ulimit then run the command
+    return spawn('bash', ['-c', `ulimit -n 65536 && "${escapedCommand}" ${escapedArgs}`], finalOptions);
+  }
+  
+  // For all other cases, spawn normally
+  return spawn(command, args, options);
+}
 
 class ChainManager {
   constructor(mainWindow, config, downloadManager) {
@@ -293,7 +333,7 @@ class ChainManager {
             await fs.promises.chmod(fullBinaryPath, "755");
           }
           
-          const childProcess = spawn(fullBinaryPath, [], { 
+          const childProcess = spawnWithHighLimits(fullBinaryPath, [], { 
             cwd: basePath,
             // Ensure SIGINT is used for graceful shutdown on Windows
             windowsHide: true 
@@ -329,7 +369,7 @@ class ChainManager {
       const args = [...baseArgs, ...additionalArgs];
       console.log(`Starting ${chainId} with args:`, args);
       
-      const childProcess = spawn(fullBinaryPath, args, { cwd: basePath });
+      const childProcess = spawnWithHighLimits(fullBinaryPath, args, { cwd: basePath });
       this.runningProcesses[chainId] = childProcess;
       
       if (chainId !== 'bitcoin') {
@@ -615,16 +655,14 @@ class ChainManager {
           }
 
           console.log('Attempting graceful shutdown with:', bitcoinCliPath);
-          const stopProcess = spawn(bitcoinCliPath, [
+          const stopProcess = spawnWithHighLimits(bitcoinCliPath, [
             '-signet',
             '-rpcuser=user',
             '-rpcpassword=password',
             '-rpcport=38332',
             '-rpcbind=0.0.0.0',
             'stop'
-          ], {
-            shell: true
-          });
+          ], { shell: true });
 
           stopProcess.stderr.on('data', (data) => {
             console.error('bitcoin-cli error:', data.toString());

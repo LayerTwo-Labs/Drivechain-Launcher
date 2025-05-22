@@ -1,4 +1,5 @@
 const { app, BrowserWindow, ipcMain, shell, powerSaveBlocker } = require("electron");
+const { execSync } = require('child_process');
 
 // Disable sandbox for Linux
 if (process.platform === 'linux') {
@@ -18,6 +19,26 @@ const DownloadManager = require("./modules/downloadManager");
 const ApiManager = require("./modules/apiManager");
 const DirectoryManager = require("./modules/directoryManager");
 const UpdateManager = require("./modules/updateManager");
+
+// Increase file descriptor limits
+function increaseFileDescriptorLimits() {
+  try {
+    // Lazy-load the fdLimitManager to avoid circular dependencies
+    const fdLimitManager = require('./modules/fdLimitManager');
+    
+    // Try to set the limit to 65536
+    const success = fdLimitManager.setFdLimit(65536);
+    
+    if (success) {
+      console.log(`Successfully increased file descriptor limit to 65536`);
+    } else if (process.platform === 'darwin') {
+      console.log(`Could not increase file descriptor limit using native module.`);
+      console.log(`Child processes will use per-process limits via spawnWithHighLimits.`);
+    }
+  } catch (error) {
+    // Silent error handling to avoid startup issues
+  }
+}
 
 const configPath = path.join(__dirname, "chain_config.json");
 let config;
@@ -856,6 +877,9 @@ async function initialize() {
 app.commandLine.appendSwitch('no-sandbox');
 
 async function startApp() {
+  // Increase file descriptor limits first
+  increaseFileDescriptorLimits();
+  
   // Show loading window first
   createLoadingWindow();
   

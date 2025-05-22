@@ -1,0 +1,13 @@
+{
+  "name": "set-limits",
+  "version": "1.0.0",
+  "description": "Native module for setting file descriptor limits",
+  "main": "fdLimitManager.js",
+  "scripts": {
+    "install": "node-gyp rebuild || echo 'Native module build failed, will use fallback'"
+  },
+  "dependencies": {
+    "node-addon-api": "^5.0.0"
+  },
+  "gypfile": true
+} 

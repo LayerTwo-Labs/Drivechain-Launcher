@@ -71,6 +71,20 @@ jobs:
       # ---------------------------------
       # macOS Build
       # ---------------------------------
+      - name: Install node-addon-api for macOS
+        if: matrix.os == 'macos-latest'
+        run: |
+          cd public/modules
+          npm install node-addon-api
+
+      - name: Build native fd limit module for macOS
+        if: matrix.os == 'macos-latest'
+        run: |
+          cd public/modules
+          npx node-gyp rebuild
+          # Verify module was built
+          ls -la build/Release || echo "Native module build failed, app will use fallback"
+      
       - name: Build & Sign Electron app (macOS)
         if: matrix.os == 'macos-latest'
         env:
@@ -200,7 +214,8 @@ jobs:
     name: Upload to releases.drivechain.info
     runs-on: ubuntu-latest
     needs: [build]
-    if: github.event_name == 'push' && github.repository_owner == 'LayerTwo-Labs'
+    # Only run on master branch in the main repository
+    if: github.event_name == 'push' && github.ref == 'refs/heads/master' && github.repository_owner == 'LayerTwo-Labs'
     steps:
       - name: Download artifacts
         uses: actions/download-artifact@v4
