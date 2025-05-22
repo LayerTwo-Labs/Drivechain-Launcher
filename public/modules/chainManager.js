@@ -1,10 +1,16 @@
 const { app, shell } = require("electron");
 const fs = require("fs-extra");
 const path = require("path");
-const { spawn } = require("child_process");
+const { spawn, execSync } = require("child_process");
 const BitcoinMonitor = require("./bitcoinMonitor");
 const BitWindowClient = require("./bitWindowClient");
 const EnforcerClient = require("./enforcerClient");
+const os = require('os');
+const fdLimitManager = require('./fdLimitManager');
+
+// Get current file descriptor limit
+const currentFdLimit = fdLimitManager.getCurrentLimit();
+console.log(`Current file descriptor limit: ${currentFdLimit}`);
 
 class ChainManager {
   constructor(mainWindow, config, downloadManager) {
@@ -622,9 +628,7 @@ class ChainManager {
             '-rpcport=38332',
             '-rpcbind=0.0.0.0',
             'stop'
-          ], {
-            shell: true
-          });
+          ], { shell: true });
 
           stopProcess.stderr.on('data', (data) => {
             console.error('bitcoin-cli error:', data.toString());

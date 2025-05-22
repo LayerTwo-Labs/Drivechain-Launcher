@@ -11,6 +11,9 @@
 # production
 /build
 /dist
+/public/modules/build/
+/public/modules/node_modules/
+/public/modules/package-lock.json
 
 # misc
 .DS_Store

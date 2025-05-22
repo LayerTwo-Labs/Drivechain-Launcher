@@ -1,4 +1,5 @@
 const { app, BrowserWindow, ipcMain, shell, powerSaveBlocker } = require("electron");
+const { execSync } = require('child_process');
 
 // Disable sandbox for Linux
 if (process.platform === 'linux') {
@@ -18,6 +19,44 @@ const DownloadManager = require("./modules/downloadManager");
 const ApiManager = require("./modules/apiManager");
 const DirectoryManager = require("./modules/directoryManager");
 const UpdateManager = require("./modules/updateManager");
+
+// Increase file descriptor limits
+function increaseFileDescriptorLimits() {
+  try {
+    // Lazy-load the fdLimitManager to avoid circular dependencies
+    const fdLimitManager = require('./modules/fdLimitManager');
+    
+    // For macOS, use the native module
+    if (process.platform === 'darwin') {
+      // Try to set the soft limit to 1000 without changing hard limit
+      const result = fdLimitManager.setFdLimit(1000);
+      
+      if (result.success) {
+        console.log(`Successfully increased file descriptor soft limit to ${result.limit}`);
+      } else {
+        console.log(`Could not increase file descriptor limit using native module.`);
+        console.log(`Child processes will run with default system limits.`);
+      }
+    } 
+    // For Linux, use prlimit to just set the soft limit
+    else if (process.platform === 'linux') {
+      try {
+        const { execSync } = require('child_process');
+        // Set only the soft limit, keep hard limit as-is with empty value
+        execSync(`prlimit --pid ${process.pid} --nofile=1000:`);
+        
+        // Verify the limit was set
+        const output = execSync(`prlimit --pid ${process.pid} --nofile --raw --noheadings`).toString().trim();
+        const [soft] = output.split(/\s+/).map(Number);
+        console.log(`Successfully increased file descriptor soft limit to ${soft}`);
+      } catch (error) {
+        console.error('Failed to set file descriptor limit on Linux:', error);
+      }
+    }
+  } catch (error) {
+    // Silent error handling to avoid startup issues
+  }
+}
 
 const configPath = path.join(__dirname, "chain_config.json");
 let config;
@@ -856,6 +895,9 @@ async function initialize() {
 app.commandLine.appendSwitch('no-sandbox');
 
 async function startApp() {
+  // Increase file descriptor limits first
+  increaseFileDescriptorLimits();
+  
   // Show loading window first
   createLoadingWindow();
   
