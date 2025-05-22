@@ -12,17 +12,6 @@ const fdLimitManager = require('./fdLimitManager');
 const currentFdLimit = fdLimitManager.getCurrentLimit();
 console.log(`Current file descriptor limit: ${currentFdLimit}`);
 
-// Wrapper for spawn that handles file descriptor limits
-function spawnWithHighLimits(command, args, options = {}) {
-  // Handle utility commands directly without modification
-  if (command.includes('open') || command.includes('killall') || command.includes('taskkill')) {
-    return spawn(command, args, options);
-  }
-  
-  // For all platforms, just use normal spawn - fd limits are handled globally in app initialization
-  return spawn(command, args, options);
-}
-
 class ChainManager {
   constructor(mainWindow, config, downloadManager) {
     this.mainWindow = mainWindow;
@@ -310,7 +299,7 @@ class ChainManager {
             await fs.promises.chmod(fullBinaryPath, "755");
           }
           
-          const childProcess = spawnWithHighLimits(fullBinaryPath, [], { 
+          const childProcess = spawn(fullBinaryPath, [], { 
             cwd: basePath,
             // Ensure SIGINT is used for graceful shutdown on Windows
             windowsHide: true 
@@ -346,7 +335,7 @@ class ChainManager {
       const args = [...baseArgs, ...additionalArgs];
       console.log(`Starting ${chainId} with args:`, args);
       
-      const childProcess = spawnWithHighLimits(fullBinaryPath, args, { cwd: basePath });
+      const childProcess = spawn(fullBinaryPath, args, { cwd: basePath });
       this.runningProcesses[chainId] = childProcess;
       
       if (chainId !== 'bitcoin') {
@@ -632,7 +621,7 @@ class ChainManager {
           }
 
           console.log('Attempting graceful shutdown with:', bitcoinCliPath);
-          const stopProcess = spawnWithHighLimits(bitcoinCliPath, [
+          const stopProcess = spawn(bitcoinCliPath, [
             '-signet',
             '-rpcuser=user',
             '-rpcpassword=password',

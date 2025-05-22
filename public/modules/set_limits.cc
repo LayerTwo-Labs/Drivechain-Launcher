@@ -1,6 +1,23 @@
 #include <napi.h>
 #include <sys/resource.h>
 
+Napi::Value GetFileDescriptorLimit(const Napi::CallbackInfo& info) {
+  Napi::Env env = info.Env();
+  
+  // Get current limits
+  struct rlimit current_rlim;
+  if (getrlimit(RLIMIT_NOFILE, &current_rlim) != 0) {
+    return Napi::Number::New(env, -1); // Error
+  }
+  
+  // Create object with soft and hard limits
+  Napi::Object result = Napi::Object::New(env);
+  result.Set("soft", Napi::Number::New(env, current_rlim.rlim_cur));
+  result.Set("hard", Napi::Number::New(env, current_rlim.rlim_max));
+  
+  return result;
+}
+
 Napi::Value SetFileDescriptorLimit(const Napi::CallbackInfo& info) {
   Napi::Env env = info.Env();
   
@@ -40,6 +57,10 @@ Napi::Object Init(Napi::Env env, Napi::Object exports) {
   exports.Set(
     Napi::String::New(env, "setFileDescriptorLimit"),
     Napi::Function::New(env, SetFileDescriptorLimit)
+  );
+  exports.Set(
+    Napi::String::New(env, "getFileDescriptorLimit"),
+    Napi::Function::New(env, GetFileDescriptorLimit)
   );
   return exports;
 }

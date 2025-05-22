@@ -30,21 +30,31 @@ class FdLimitManager {
   /**
    * Set file descriptor limits for the current process
    * @param {number} limit - The limit to set
-   * @returns {boolean} - Whether the operation was successful
+   * @returns {object} - Object with success boolean and actual limit set
    */
   setFdLimit(limit) {
     // This only works on macOS with the native module
     if (process.platform === 'darwin' && this.initialized && this.nativeModule) {
       try {
         const result = this.nativeModule.setFileDescriptorLimit(limit);
-        return result === 0; // 0 means success in syscalls
+        
+        if (result === 0) { // 0 means success in syscalls
+          // Get the actual limit that was set (might be different from requested)
+          const actualLimits = this.nativeModule.getFileDescriptorLimit();
+          return { 
+            success: true, 
+            limit: actualLimits.soft 
+          };
+        }
+        
+        return { success: false, limit: 0 };
       } catch (error) {
         console.error('Failed to set file descriptor limit:', error);
-        return false;
+        return { success: false, limit: 0 };
       }
     }
     
-    return false;
+    return { success: false, limit: 0 };
   }
   
   /**
@@ -56,9 +66,9 @@ class FdLimitManager {
       if (process.platform === 'darwin') {
         // On macOS, get process-specific limit if possible
         if (this.initialized && this.nativeModule) {
-          // If we have the native module, assume the limit was set by it
-          // In the future, we could add a getrlimit call to the native module
-          return 1000; 
+          // Use the native module to get the current limit
+          const limits = this.nativeModule.getFileDescriptorLimit();
+          return limits.soft || -1;
         }
         // Fallback - this isn't ideal but better than nothing
         return -1;
